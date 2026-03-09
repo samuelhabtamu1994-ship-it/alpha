@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Alpha Bingo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700;900&family=Noto+Sans+Ethiopic:wght@400;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+  <div class="overlay" id="menuOverlay" onclick="closeMenu()"></div>
+
+  <aside class="side-menu" id="sideMenu">
+    <div class="menu-inner">
+      <div class="menu-profile">
+        <div class="menu-avatar" id="menuAvatar">?</div>
+        <div class="menu-user-info">
+          <div class="menu-name" id="menuName">Loading...</div>
+          <div class="menu-phone" id="menuPhone">ስልክ አልተቀጠረም</div>
+        </div>
+      </div>
+      <div class="menu-balance-box">
+        <span class="mbl-label">ቀሪ ሂሳብ</span>
+        <span class="mbl-value" id="menuBalance">0</span>
+        <span class="mbl-curr">ETB</span>
+      </div>
+      <nav class="menu-nav">
+        <button class="menu-nav-btn" onclick="openDeposit(); closeMenu()">
+          <span class="mnb-icon">📥</span><span>ገንዘብ ያስገቡ (Deposit)</span>
+        </button>
+        <button class="menu-nav-btn" onclick="openWithdraw(); closeMenu()">
+          <span class="mnb-icon">📤</span><span>ገንዘብ ያውጡ (Withdraw)</span>
+        </button>
+        <button class="menu-nav-btn" onclick="showHistory(); closeMenu()">
+          <span class="mnb-icon">📋</span><span>የግብይት ታሪክ</span>
+        </button>
+        <a class="menu-nav-btn" href="https://t.me/Alphabingosupport" target="_blank">
+          <span class="mnb-icon">💬</span><span>Support @Alphabingosupport</span>
+        </a>
+      </nav>
+      <div class="menu-footer">Alpha Bingo v1.0 &copy; 2024</div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <header class="top-bar">
+    <div class="top-balance" onclick="openWalletModal()">
+      <span class="tb-coin">💰</span>
+      <span id="topBalance">0</span>
+    </div>
+    <div class="top-logo">ALPHA<span>BINGO</span></div>
+    <div class="top-right-btns">
+      <button class="notif-bell-btn" id="notifBellBtn" onclick="openNotifInbox()">
+        🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span>
+      </button>
+      <button class="menu-toggle" onclick="openMenu()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION INBOX MODAL -->
+  <div class="modal-overlay" id="notifOverlay" onclick="closeNotifInbox()"></div>
+  <div class="notif-modal" id="notifModal">
+    <div class="notif-header">
+      <div class="notif-title">🔔 ማሳወቂያዎች</div>
+      <button class="upm-close" onclick="closeNotifInbox()">✕</button>
+    </div>
+    <div class="notif-list" id="notifList">
+      <div class="notif-empty">ምንም ማሳወቂያ የለም</div>
+    </div>
+  </div>
+
+  <main class="screens">
+
+    <section class="screen active" id="screen-home">
+      <div class="home-hero">
+        <div class="hero-badge">🎯 LIVE GAMES</div>
+        <div class="hero-title">የመወራረጃ<br>መጠን ይምረጡ</div>
+        <div class="hero-sub">Choose your stake to enter the game</div>
+      </div>
+      <div class="stake-grid" id="stakeGrid"></div>
+    </section>
+
+    <section class="screen" id="screen-card">
+      <div class="sub-header">
+        <button class="back-btn" onclick="goHome()">❮</button>
+        <div class="sub-title">ካርድ ይምረጡ</div>
+        <div class="sub-badge" id="cardBadge">10 ETB</div>
+      </div>
+      <div class="card-picker-grid" id="cardPickerGrid"></div>
+      <div class="card-preview-wrap">
+        <div class="cp-label" id="cpLabel">Card #1</div>
+        <div class="bingo-preview" id="bingoPreview"></div>
+      </div>
+      <button class="cta-btn" id="startGameBtn" onclick="joinGame()">🎮 ጨዋታውን ጀምር</button>
+    </section>
+
+    <section class="screen" id="screen-lobby">
+      <div class="lobby-wrap">
+        <div class="lobby-spinner"></div>
+        <div class="lobby-title">ተጫዋቾችን በመጠበቅ ላይ...</div>
+        <div class="lobby-count">
+          <span id="lobbyJoined">0</span> / <span id="lobbyNeeded">6</span> ተጫዋቾች
+        </div>
+        <div class="lobby-players" id="lobbyPlayers"></div>
+        <button class="cancel-btn" onclick="cancelLobby()">❌ ሰርዝ</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-game">
+      <div class="game-topbar">
+        <div class="gtb-left">
+          <div class="gtb-round" id="gtbRound">Round 1</div>
+          <div class="gtb-players" id="gtbPlayers">👥 6</div>
+        </div>
+        <div class="gtb-prize" id="gtbPrize">🏆 0 ETB</div>
+        <div class="gtb-call-count" id="gtbCallCount">Call 0/20</div>
+        <button class="gtb-leave" onclick="leaveGame()">Exit</button>
+      </div>
+      <div class="game-layout">
+        <div class="call-zone">
+          <div class="call-zone-title">CALL ZONE</div>
+          <div class="current-call-wrap">
+            <div class="current-call-letter" id="currentCallLetter">-</div>
+            <div class="current-call-number" id="currentCallNumber">?</div>
+          </div>
+          <div class="call-history" id="callHistory"></div>
+          <div class="called-grid" id="calledGrid"></div>
+        </div>
+        <div class="player-card-zone">
+          <div class="pcz-label">የእርስዎ ካርድ</div>
+          <div class="bingo-card-header">
+            <span class="bch bch-b">B</span>
+            <span class="bch bch-i">I</span>
+            <span class="bch bch-n">N</span>
+            <span class="bch bch-g">G</span>
+            <span class="bch bch-o">O</span>
+          </div>
+          <div class="bingo-card" id="gameCard"></div>
+          <button class="bingo-shout-btn" id="bingoShoutBtn" onclick="shoutBingo()">🎉 BINGO!</button>
+        </div>
+      </div>
+      <div class="players-strip" id="playersStrip"></div>
+    </section>
+
+    <section class="screen" id="screen-result">
+      <div class="result-wrap" id="resultWrap">
+        <div class="result-emoji" id="resultEmoji">🏆</div>
+        <div class="result-title" id="resultTitle">አሸነፉ!</div>
+        <div class="result-amount" id="resultAmount">+540 ETB</div>
+        <div class="result-winner" id="resultWinner">Winner: @you</div>
+        <div class="result-sub" id="resultSub">ሽልማቱ ወደ ሂሳብዎ ተጨምሯል</div>
+        <button class="cta-btn" onclick="goHome()">🎮 እንደገና ይጫወቱ</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-deposit">
+      <div class="sub-header">
+        <button class="back-btn" onclick="goHome()">❮</button>
+        <div class="sub-title">Deposit</div>
+        <div class="sub-badge" style="background:rgba(0,200,83,0.2);color:#00c853;">TeleBirr</div>
+      </div>
+      <div class="deposit-card">
+        <div class="dc-title">💰 ገንዘብ ማስገቢያ</div>
+        <div class="dc-field-label">የአካውንት ስም</div>
+        <div class="dc-field-val">Getachew Abera</div>
+        <div class="dc-field-label">TeleBirr ቁጥር</div>
+        <div class="dc-copy-row">
+          <span id="depositPhone">0990633294</span>
+          <button class="copy-btn" onclick="copyPhone()">📋 ኮፒ</button>
+        </div>
+        <div class="dc-field-label">የብር መጠን (ቢያንስ 50 ETB)</div>
+        <input type="number" class="dc-input" id="depAmount" placeholder="100" min="50" />
+        <div class="dc-field-label">SMS ማረጋገጫ (TeleBirr)</div>
+        <input type="text" class="dc-input" id="depSms" placeholder="SMS code ይለጥፉ" />
+        <button class="cta-btn" style="margin-top:16px" onclick="submitDeposit()">📥 ጥያቄ ላክ</button>
+      </div>
+      <div class="history-section">
+        <div class="hs-title">📋 የቅርብ ጊዜ ትዕዛዞች</div>
+        <div id="depositHistory"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-admin">
+      <div class="sub-header">
+        <div class="sub-title">👑 Admin Panel</div>
+        <div class="sub-badge" style="background:rgba(255,0,0,0.2);color:#ff4444;">Alpha Bingo</div>
+      </div>
+      <div class="admin-stats-row">
+        <div class="admin-stat-box">
+          <div class="asb-val" id="adminTotalUsers">—</div>
+          <div class="asb-lbl">ተጫዋቾች</div>
+        </div>
+        <div class="admin-stat-box">
+          <div class="asb-val" id="adminPendingDep">—</div>
+          <div class="asb-lbl">Pending Deposit</div>
+        </div>
+        <div class="admin-stat-box">
+          <div class="asb-val" id="adminPendingWd">—</div>
+          <div class="asb-lbl">Pending Withdraw</div>
+        </div>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" id="tabDeposit" onclick="window.adminTab('deposit')">📥 Deposits</button>
+        <button class="admin-tab" id="tabWithdraw" onclick="window.adminTab('withdraw')">📤 Withdrawals</button>
+        <button class="admin-tab" id="tabUsers" onclick="window.adminTab('users')">👥 Users</button>
+      </div>
+      <div class="admin-panel" id="adminPanelDeposit">
+        <div id="adminDepositList" class="admin-list"></div>
+      </div>
+      <div class="admin-panel" id="adminPanelWithdraw" style="display:none">
+        <div id="adminWithdrawList" class="admin-list"></div>
+      </div>
+      <div class="admin-panel" id="adminPanelUsers" style="display:none">
+        <div id="adminUserList" class="admin-list"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-withdraw">
+      <div class="sub-header">
+        <button class="back-btn" onclick="goHome()">❮</button>
+        <div class="sub-title">Withdraw</div>
+        <div class="sub-badge" style="background:rgba(255,165,0,0.2);color:#ffa500;">TeleBirr</div>
+      </div>
+      <div class="deposit-card">
+        <div class="dc-title">📤 ገንዘብ ማውጫ</div>
+        <div class="withdraw-balance-box">
+          <span class="wbb-label">ቀሪ ሂሳብ</span>
+          <span class="wbb-amount" id="withdrawBalanceDisplay">0 ETB</span>
+        </div>
+        <div class="dc-field-label">TeleBirr ቁጥር</div>
+        <input type="tel" class="dc-input" id="wdPhone" placeholder="09XXXXXXXX" maxlength="10" />
+        <div class="dc-field-label">የሚወጣ መጠን (ቢያንስ 50 ETB)</div>
+        <input type="number" class="dc-input" id="wdAmount" placeholder="100" min="50" />
+        <div class="withdraw-note"><span>⚠</span><span>ከ 1-10 ደቂቃ ውስጥ ወደ አካውንትዎ ገቢ ይሆናል።</span></div>
+        <button class="cta-btn withdraw-cta" style="margin-top:16px" onclick="submitWithdraw()">📤 ጥያቄ ላክ</button>
+      </div>
+      <div class="history-section">
+        <div class="hs-title">📋 የቅርብ ጊዜ ክፍያዎች</div>
+        <div id="withdrawHistory"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-history">
+      <div class="sub-header">
+        <button class="back-btn" onclick="goHome()">❮</button>
+        <div class="sub-title">የግብይት ታሪክ</div>
+      </div>
+      <div id="fullHistory" class="history-list"></div>
+    </section>
+
+  </main>
+
+  <div class="wallet-modal-overlay" id="walletModalOverlay" onclick="closeWalletModal()"></div>
+  <div class="wallet-modal" id="walletModal">
+    <div class="wm-inner">
+      <div class="wm-header">
+        <span class="wm-label">ሂሳብ አስተዳደር</span>
+        <button class="wm-close-btn" onclick="closeWalletModal()">✕</button>
+      </div>
+      <div class="wm-balance-row">
+        <span class="wm-coin">💰</span>
+        <span class="wm-balance" id="wmBalance">0</span>
+        <span class="wm-curr-tag">ETB</span>
+      </div>
+      <div class="wm-buttons">
+        <button class="wm-btn wm-deposit" onclick="closeWalletModal(); openDeposit()">
+          <span class="wm-btn-icon">📥</span>
+          <span class="wm-btn-name">Deposit</span>
+          <span class="wm-btn-sub">ገንዘብ ያስገቡ</span>
+        </button>
+        <button class="wm-btn wm-withdraw" onclick="closeWalletModal(); openWithdraw()">
+          <span class="wm-btn-icon">📤</span>
+          <span class="wm-btn-name">Withdraw</span>
+          <span class="wm-btn-sub">ገንዘብ ያውጡ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="confetti-wrap" id="confettiWrap"></div>
+
+  <!-- USER PROFILE MODAL (Admin) -->
+  <div class="modal-overlay" id="userProfileOverlay" onclick="closeUserProfile()"></div>
+  <div class="user-profile-modal" id="userProfileModal">
+    <div class="upm-header">
+      <div class="upm-avatar" id="upmAvatar">?</div>
+      <div class="upm-info">
+        <div class="upm-name" id="upmName">—</div>
+        <div class="upm-username" id="upmUsername">—</div>
+        <div class="upm-id" id="upmId">—</div>
+      </div>
+      <button class="upm-close" onclick="closeUserProfile()">✕</button>
+    </div>
+
+    <div class="upm-balance-bar">
+      <div class="upm-bal-box">
+        <div class="upm-bal-val" id="upmBalance">0</div>
+        <div class="upm-bal-lbl">ETB ቀሪ ሂሳብ</div>
+      </div>
+      <div class="upm-bal-box">
+        <div class="upm-bal-val upm-teal" id="upmJoined">—</div>
+        <div class="upm-bal-lbl">የተቀጠሩበት</div>
+      </div>
+    </div>
+
+    <div class="upm-stats-row">
+      <div class="upm-stat">
+        <div class="upm-stat-val" id="upmDepCount">0</div>
+        <div class="upm-stat-lbl">Deposits</div>
+      </div>
+      <div class="upm-stat">
+        <div class="upm-stat-val" id="upmDepTotal">0</div>
+        <div class="upm-stat-lbl">Total ETB In</div>
+      </div>
+      <div class="upm-stat">
+        <div class="upm-stat-val" id="upmWdCount">0</div>
+        <div class="upm-stat-lbl">Withdrawals</div>
+      </div>
+      <div class="upm-stat">
+        <div class="upm-stat-val" id="upmWdTotal">0</div>
+        <div class="upm-stat-lbl">Total ETB Out</div>
+      </div>
+      <div class="upm-stat">
+        <div class="upm-stat-val" id="upmGames">0</div>
+        <div class="upm-stat-lbl">ጨዋታዎች</div>
+      </div>
+      <div class="upm-stat">
+        <div class="upm-stat-val upm-lime" id="upmWins">0</div>
+        <div class="upm-stat-lbl">ድሎች</div>
+      </div>
+    </div>
+
+    <div class="upm-section-title">📋 የደብዳቤ ታሪክ (ቅርብ ጊዜ)</div>
+    <div class="upm-tx-list" id="upmTxList"></div>
+
+    <div class="upm-actions">
+      <button class="upm-btn upm-btn-balance" onclick="upmAdjustBalance()">💰 Balance አስተካክል</button>
+      <button class="upm-btn upm-btn-msg" onclick="openSendMsg()">✉️ ሜሴጅ ላክ</button>
+    </div>
+  </div>
+
+  <!-- SEND MESSAGE MODAL -->
+  <div class="modal-overlay" id="sendMsgOverlay" onclick="closeSendMsg()"></div>
+  <div class="send-msg-modal" id="sendMsgModal">
+    <div class="smm-header">
+      <div class="smm-title">✉️ ሜሴጅ ላክ</div>
+      <div class="smm-to" id="smmTo">—</div>
+      <button class="upm-close" onclick="closeSendMsg()">✕</button>
+    </div>
+    <textarea class="smm-input" id="smmText" placeholder="ሜሴጁን እዚህ ይጻፉ..."></textarea>
+    <button class="smm-send-btn" onclick="sendAdminMsg()">📤 ሜሴጅ ላክ</button>
+  </div>
+
+  <script type="module" src="script.js?v=6"></script>
+</body>
+</html>
