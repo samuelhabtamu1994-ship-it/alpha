@@ -2497,18 +2497,18 @@ window.sendAdminMsg = sendAdminMsg;
 function openNotifInbox() {
   document.getElementById("notifOverlay").classList.add("active");
   document.getElementById("notifModal").classList.add("active");
-  markNotifsRead();
+  // Do NOT markNotifsRead() here — it triggers an onValue re-fire that
+  // races with snapshot rendering and hides subsequent messages.
+  // Mark as read only when the user closes the inbox.
 }
 window.openNotifInbox = openNotifInbox;
 
 function closeNotifInbox() {
   document.getElementById("notifOverlay").classList.remove("active");
   document.getElementById("notifModal").classList.remove("active");
+  markNotifsRead();
 }
 window.closeNotifInbox = closeNotifInbox;
-
-// Track keys rendered last time so we can detect truly new arrivals
-let _lastNotifKeys = new Set();
 
 function startNotifListener() {
   onValue(ref(db, "users/" + UID + "/notifications"), snap => {
@@ -2518,62 +2518,56 @@ function startNotifListener() {
 
     if (!snap.exists()) {
       list.innerHTML = "<div class='notif-empty'>ምንም ማሳወቂያ የለም</div>";
-      badge.style.display = "none";
-      _lastNotifKeys = new Set();
+      if (badge) { badge.style.display = "none"; }
       return;
     }
 
-    // Collect all notifications from snapshot
+    // Collect all notifications
     const notifs = [];
     snap.forEach(child => notifs.push({ key: child.key, ...child.val() }));
 
-    // Stable sort: use Firebase push key (lexicographic = insertion order) as tiebreaker
-    // This avoids re-ordering when serverTimestamp() first arrives as null then fills in
+    // Sort newest first — use push key as tiebreaker (avoids flicker when ts=null on first write)
     notifs.sort((a, b) => {
-      const ta = a.ts || 0;
-      const tb = b.ts || 0;
-      if (tb !== ta) return tb - ta;           // newest first by timestamp
-      return b.key > a.key ? 1 : -1;          // tiebreak by push key (stable)
+      const ta = a.ts || 0, tb = b.ts || 0;
+      if (tb !== ta) return tb - ta;
+      return b.key > a.key ? 1 : -1;
     });
 
-    // Badge: count unread
+    // Badge
     const unread = notifs.filter(n => !n.read).length;
-    if (unread > 0) {
-      badge.textContent   = unread > 9 ? "9+" : unread;
-      badge.style.display = "flex";
-    } else {
-      badge.style.display = "none";
+    if (badge) {
+      if (unread > 0) {
+        badge.textContent   = unread > 9 ? "9+" : unread;
+        badge.style.display = "flex";
+      } else {
+        badge.style.display = "none";
+      }
     }
 
-    // Detect which keys are genuinely new this render
-    const incomingKeys = new Set(notifs.map(n => n.key));
-    const newKeys = new Set([...incomingKeys].filter(k => !_lastNotifKeys.has(k)));
-    _lastNotifKeys = incomingKeys;
-
-    // Full re-render — simple and correct, avoids all DOM diffing bugs
+    // Full re-render — simple and correct
     list.innerHTML = "";
     notifs.forEach(n => {
       const item = document.createElement("div");
-      item.dataset.key = n.key;
-      item.className   = "notif-item" + (!n.read ? " notif-unread" : "");
+      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
 
-      item.appendChild(_el("div", "notif-item-from", n.from || "Admin"));
-      item.appendChild(_el("div", "notif-item-msg",  n.message || ""));
+      const fromEl = document.createElement("div");
+      fromEl.className   = "notif-item-from";
+      fromEl.textContent = n.from || "Admin";
+      item.appendChild(fromEl);
 
-      // Timestamp: use push-key embedded time as fallback when serverTimestamp not yet filled
-      const tsMs = n.ts || null;
-      if (tsMs) {
-        const d = new Date(tsMs);
+      const msgEl = document.createElement("div");
+      msgEl.className   = "notif-item-msg";
+      msgEl.textContent = n.message || "";
+      item.appendChild(msgEl);
+
+      if (n.ts) {
+        const d = new Date(n.ts);
         const p = x => String(x).padStart(2, "0");
-        item.appendChild(_el("div", "notif-item-time",
-          d.getFullYear() + "/" + p(d.getMonth()+1) + "/" + p(d.getDate()) +
-          " " + p(d.getHours()) + ":" + p(d.getMinutes())));
-      }
-
-      // Slide-in animation only for truly new items
-      if (newKeys.has(n.key)) {
-        item.classList.add("notif-new");
-        setTimeout(() => item.classList.remove("notif-new"), 400);
+        const timeEl = document.createElement("div");
+        timeEl.className   = "notif-item-time";
+        timeEl.textContent = d.getFullYear() + "/" + p(d.getMonth()+1) + "/" + p(d.getDate()) +
+                             " " + p(d.getHours()) + ":" + p(d.getMinutes());
+        item.appendChild(timeEl);
       }
 
       list.appendChild(item);
