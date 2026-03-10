@@ -2478,17 +2478,24 @@ async function sendAdminMsg() {
   if (!_currentMsgUid) return;
 
   try {
-    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
+    const notifPath = "users/" + _currentMsgUid + "/notifications";
+    console.log("[sendAdminMsg] to uid:", _currentMsgUid, "path:", notifPath);
+    const msgRef = push(ref(db, notifPath));
+    console.log("[sendAdminMsg] push key:", msgRef.key);
     await set(msgRef, {
       from:    "Alpha Bingo Admin",
       message: text,
       read:    false,
       ts:      serverTimestamp()
     });
-    toast("✅ ሜሴጅ ተላልፏል!");
+    const check = await get(ref(db, notifPath));
+    const count = check.exists() ? Object.keys(check.val()).length : 0;
+    console.log("[sendAdminMsg] DB now has", count, "notifications for this user");
+    toast("\u2705 \u1230ሴጅ ተላልፏል! (DB count: " + count + ")");
     closeSendMsg();
   } catch(e) {
-    toast("❌ Error: " + e.message);
+    console.error("[sendAdminMsg] error:", e);
+    toast("\u274C Error: " + e.message);
   }
 }
 window.sendAdminMsg = sendAdminMsg;
@@ -2497,80 +2504,87 @@ window.sendAdminMsg = sendAdminMsg;
 function openNotifInbox() {
   document.getElementById("notifOverlay").classList.add("active");
   document.getElementById("notifModal").classList.add("active");
-  // Do NOT markNotifsRead() here — it triggers an onValue re-fire that
-  // races with snapshot rendering and hides subsequent messages.
-  // Mark as read only when the user closes the inbox.
+  markNotifsRead();
 }
 window.openNotifInbox = openNotifInbox;
 
 function closeNotifInbox() {
   document.getElementById("notifOverlay").classList.remove("active");
   document.getElementById("notifModal").classList.remove("active");
-  markNotifsRead();
 }
 window.closeNotifInbox = closeNotifInbox;
 
 function startNotifListener() {
+  console.log("[startNotifListener] attaching listener for UID:", UID);
   onValue(ref(db, "users/" + UID + "/notifications"), snap => {
+    console.log("[notifListener] fired! exists:", snap.exists());
+    if (snap.exists()) {
+      const keys = [];
+      snap.forEach(c => keys.push(c.key + "=" + JSON.stringify(c.val()).substring(0,60)));
+      console.log("[notifListener] children:", keys);
+    }
     const list  = document.getElementById("notifList");
     const badge = document.getElementById("notifBadge");
     if (!list) return;
 
     if (!snap.exists()) {
       list.innerHTML = "<div class='notif-empty'>ምንም ማሳወቂያ የለም</div>";
-      if (badge) { badge.style.display = "none"; }
+      badge.style.display = "none";
       return;
     }
 
-    // Collect all notifications
     const notifs = [];
     snap.forEach(child => notifs.push({ key: child.key, ...child.val() }));
+    notifs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-    // Sort newest first — use push key as tiebreaker (avoids flicker when ts=null on first write)
-    notifs.sort((a, b) => {
-      const ta = a.ts || 0, tb = b.ts || 0;
-      if (tb !== ta) return tb - ta;
-      return b.key > a.key ? 1 : -1;
-    });
-
-    // Badge
+    // Update badge
     const unread = notifs.filter(n => !n.read).length;
-    if (badge) {
-      if (unread > 0) {
-        badge.textContent   = unread > 9 ? "9+" : unread;
-        badge.style.display = "flex";
-      } else {
-        badge.style.display = "none";
-      }
+    if (unread > 0) {
+      badge.textContent   = unread > 9 ? "9+" : unread;
+      badge.style.display = "flex";
+    } else {
+      badge.style.display = "none";
     }
 
-    // Full re-render — simple and correct
-    list.innerHTML = "";
-    notifs.forEach(n => {
-      const item = document.createElement("div");
-      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
+    // Build keyed map of existing DOM items to avoid full re-render (prevents blink)
+    const existing = {};
+    list.querySelectorAll(".notif-item[data-key]").forEach(el => {
+      existing[el.dataset.key] = el;
+    });
 
-      const fromEl = document.createElement("div");
-      fromEl.className   = "notif-item-from";
-      fromEl.textContent = n.from || "Admin";
-      item.appendChild(fromEl);
+    // Remove "empty" placeholder if present
+    list.querySelectorAll(".notif-empty").forEach(el => el.remove());
 
-      const msgEl = document.createElement("div");
-      msgEl.className   = "notif-item-msg";
-      msgEl.textContent = n.message || "";
-      item.appendChild(msgEl);
-
-      if (n.ts) {
-        const d = new Date(n.ts);
-        const p = x => String(x).padStart(2, "0");
-        const timeEl = document.createElement("div");
-        timeEl.className   = "notif-item-time";
-        timeEl.textContent = d.getFullYear() + "/" + p(d.getMonth()+1) + "/" + p(d.getDate()) +
-                             " " + p(d.getHours()) + ":" + p(d.getMinutes());
-        item.appendChild(timeEl);
+    // Insert or update each notification without destroying existing elements
+    notifs.forEach((n, idx) => {
+      let item = existing[n.key];
+      if (!item) {
+        item = document.createElement("div");
+        item.dataset.key = n.key;
+        const from = _el("div", "notif-item-from", n.from || "Admin");
+        const msg  = _el("div", "notif-item-msg",  n.message || "");
+        item.appendChild(from);
+        item.appendChild(msg);
+        if (n.ts) {
+          const d = new Date(n.ts);
+          const p = x => String(x).padStart(2,"0");
+          item.appendChild(_el("div", "notif-item-time",
+            d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())));
+        }
+        // Animate only newly added items
+        item.classList.add("notif-new");
+        setTimeout(() => item.classList.remove("notif-new"), 300);
       }
+      // Always sync read/unread class (no re-render = no blink)
+      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
+      // Maintain sort order
+      if (list.children[idx] !== item) list.insertBefore(item, list.children[idx] || null);
+    });
 
-      list.appendChild(item);
+    // Remove stale items no longer in snapshot
+    const currentKeys = new Set(notifs.map(n => n.key));
+    Object.keys(existing).forEach(k => {
+      if (!currentKeys.has(k)) existing[k].remove();
     });
   });
 }
