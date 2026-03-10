@@ -2055,18 +2055,28 @@ async function _approveDeposit(reqKey, uid, amount) {
     // 1. የአድሚን ጥያቄን ማጽደቅ
     await update(ref(db, `depositRequests/${reqKey}`), { status: "approved" });
 
-    // 2. በተጠቃሚው ታሪክ (Transaction History) ውስጥ status መቀየር
-    const userTxRef = ref(db, `users/${uid}/transactions`);
-    const txSnap = await get(userTxRef);
-    if (txSnap.exists()) {
-      txSnap.forEach(child => {
-        const tx = child.val();
-        // መጠኑ የሚገጥመውን እና 'pending' የሆነውን ትራንዛክሽን ፈልጎ ማጽደቅ
-        if (tx.type === "deposit" && tx.status === "pending" && Number(tx.amount) === Number(amount)) {
-          update(ref(db, `users/${uid}/transactions/${child.key}`), { status: "approved" });
-        }
-      });
-    }
+    // 2. የተጠቃሚውን ባላንስ መጨመር (ወሳኙ ስህተት እዚህ ነበር)
+    const balanceRef = ref(db, `users/${uid}/balance`);
+    const snap = await get(balanceRef);
+    const currentBal = snap.exists() ? (Number(snap.val()) || 0) : 0;
+    await set(balanceRef, currentBal + Number(amount));
+
+    // 3. ለተጠቃሚው ማሳወቂያ መላክ
+    const notifRef = push(ref(db, `users/${uid}/notifications`));
+    await set(notifRef, {
+      from: "Alpha Bingo",
+      message: `የ ${amount} ETB ዴፖዚት ጥያቄዎ ተቀባይነት አግኝቷል! 💰`,
+      ts: serverTimestamp(),
+      read: false
+    });
+
+    toast("✅ ዴፖዚቱ ጸድቋል፤ ባላንስ ተጨምሯል!");
+    _loadAdminRequests(); // ዝርዝሩን ለማደስ
+  } catch (e) {
+    toast("❌ ስህተት: " + e.message);
+  }
+}
+
 
     // 3. ባላንስ መጨመር
     const balanceRef = ref(db, `users/${uid}/balance`);
@@ -2449,25 +2459,32 @@ function closeSendMsg() {
 }
 window.closeSendMsg = closeSendMsg;
 
-async function sendAdminMsg() {
-  const text = document.getElementById("smmText").value.trim();
-  if (!text) { toast("⚠ ሜሴጁን ይጻፉ"); return; }
-  if (!_currentMsgUid) return;
-
-  try {
-    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
-    await set(msgRef, {
-      from:    "Alpha Bingo Admin",
-      message: text,
-      read:    false,
-      ts:      serverTimestamp()
-    });
-    toast("✅ ሜሴጅ ተላልፏል!");
-    closeSendMsg();
-  } catch(e) {
-    toast("❌ Error: " + e.message);
+window.sendAdminMsg = async function() {
+  const text = $("smmText").value.trim();
+  // _currentMsgUid አድሚኑ የከፈተው የተጠቃሚ ID መሆኑን ያረጋግጣል
+  if (!text || !_currentMsgUid) {
+    toast("⚠ እባክዎ መልዕክት ይጻፉ!");
+    return;
   }
-}
+  
+  try {
+    const notifRef = push(ref(db, `users/${_currentMsgUid}/notifications`));
+    await set(notifRef, {
+      from: "Alpha Bingo Support",
+      message: text,
+      ts: serverTimestamp(),
+      read: false
+    });
+    
+    closeSendMsg();
+    $("smmText").value = "";
+    toast("✅ መልዕክቱ ለተጠቃሚው ተልኳል!");
+  } catch (e) {
+    toast("❌ ስህተት: " + e.message);
+  }
+};
+
+
 window.sendAdminMsg = async function() {
   const text = $("smmText").value.trim();
   
