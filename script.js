@@ -2475,15 +2475,10 @@ window.closeSendMsg = closeSendMsg;
 async function sendAdminMsg() {
   const text = document.getElementById("smmText").value.trim();
   if (!text) { toast("⚠ ሜሴጁን ይጻፉ"); return; }
-  if (!_currentMsgUid) { toast("⚠ ተጠቃሚ አልተመረጠም"); return; }
-
-  // Capture uid locally so modal close doesn't affect it
-  const targetUid = _currentMsgUid;
-  const btn = document.querySelector(".smm-send-btn");
-  if (btn) { btn.disabled = true; btn.textContent = "⏳ በመላክ ላይ..."; }
+  if (!_currentMsgUid) return;
 
   try {
-    const msgRef = push(ref(db, "users/" + targetUid + "/notifications"));
+    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
     await set(msgRef, {
       from:    "Alpha Bingo Admin",
       message: text,
@@ -2493,10 +2488,7 @@ async function sendAdminMsg() {
     toast("✅ ሜሴጅ ተላልፏል!");
     closeSendMsg();
   } catch(e) {
-    console.error("[sendAdminMsg]", e);
-    toast("❌ ሜሴጅ አልተላከም: " + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "📤 ሜሴጅ ላክ"; }
+    toast("❌ Error: " + e.message);
   }
 }
 window.sendAdminMsg = sendAdminMsg;
@@ -2521,7 +2513,6 @@ function startNotifListener() {
     const badge = document.getElementById("notifBadge");
     if (!list) return;
 
-    list.innerHTML = "";
     if (!snap.exists()) {
       list.innerHTML = "<div class='notif-empty'>ምንም ማሳወቂያ የለም</div>";
       badge.style.display = "none";
@@ -2532,28 +2523,51 @@ function startNotifListener() {
     snap.forEach(child => notifs.push({ key: child.key, ...child.val() }));
     notifs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
+    // Update badge
     const unread = notifs.filter(n => !n.read).length;
     if (unread > 0) {
-      badge.textContent    = unread > 9 ? "9+" : unread;
-      badge.style.display  = "flex";
+      badge.textContent   = unread > 9 ? "9+" : unread;
+      badge.style.display = "flex";
     } else {
-      badge.style.display  = "none";
+      badge.style.display = "none";
     }
 
-    notifs.forEach(n => {
-      const item = document.createElement("div");
-      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
+    // Build keyed map of existing DOM items to avoid full re-render (prevents blink)
+    const existing = {};
+    list.querySelectorAll(".notif-item[data-key]").forEach(el => {
+      existing[el.dataset.key] = el;
+    });
 
-      item.appendChild(_el("div", "notif-item-from", n.from || "Admin"));
-      item.appendChild(_el("div", "notif-item-msg", n.message || ""));
+    // Remove "empty" placeholder if present
+    list.querySelectorAll(".notif-empty").forEach(el => el.remove());
 
-      if (n.ts) {
-        const d = new Date(n.ts);
-        const p = x => String(x).padStart(2,"0");
-        item.appendChild(_el("div", "notif-item-time",
-          d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())));
+    // Insert or update each notification without destroying existing elements
+    notifs.forEach((n, idx) => {
+      let item = existing[n.key];
+      if (!item) {
+        item = document.createElement("div");
+        item.dataset.key = n.key;
+        const from = _el("div", "notif-item-from", n.from || "Admin");
+        const msg  = _el("div", "notif-item-msg",  n.message || "");
+        item.appendChild(from);
+        item.appendChild(msg);
+        if (n.ts) {
+          const d = new Date(n.ts);
+          const p = x => String(x).padStart(2,"0");
+          item.appendChild(_el("div", "notif-item-time",
+            d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())));
+        }
       }
-      list.appendChild(item);
+      // Always sync read/unread class (no re-render = no blink)
+      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
+      // Maintain sort order
+      if (list.children[idx] !== item) list.insertBefore(item, list.children[idx] || null);
+    });
+
+    // Remove stale items no longer in snapshot
+    const currentKeys = new Set(notifs.map(n => n.key));
+    Object.keys(existing).forEach(k => {
+      if (!currentKeys.has(k)) existing[k].remove();
     });
   });
 }
