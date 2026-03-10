@@ -173,7 +173,15 @@ async function initUser() {
   const uRef = ref(db, `users/${UID}`);
   const snap = await get(uRef);
 
-  $("menuAvatar").textContent = (tgUser.first_name?.[0] || "?").toUpperCase();
+  // Menu avatar — use Telegram profile photo if available, fallback to initial
+  const menuAvatarEl = $("menuAvatar");
+  if (tgUser.photo_url) {
+    menuAvatarEl.innerHTML = `<img src="${tgUser.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${(tgUser.first_name?.[0] || '?').toUpperCase()}'" />`;
+    menuAvatarEl.style.padding = "0";
+    menuAvatarEl.style.overflow = "hidden";
+  } else {
+    menuAvatarEl.textContent = (tgUser.first_name?.[0] || "?").toUpperCase();
+  }
   $("menuName").textContent   = `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim() || "Player";
   $("menuPhone").textContent  = "Telegram ID: " + UID;
 
@@ -183,12 +191,17 @@ async function initUser() {
       uid: UID,
       name: `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
       username: tgUser.username || "",
+      photo_url: tgUser.photo_url || "",
       balance: 0,
       createdAt: serverTimestamp()
     });
     userBalance = 0;
   } else {
     userBalance = snap.val().balance || 0;
+    // Update photo_url if changed
+    if (tgUser.photo_url && snap.val().photo_url !== tgUser.photo_url) {
+      update(uRef, { photo_url: tgUser.photo_url }).catch(console.error);
+    }
     // Phone from firebase if stored
     const ph = snap.val().phone;
     if (ph) $("menuPhone").textContent = ph;
@@ -2358,7 +2371,15 @@ async function openUserProfile(uid) {
     const displayName = u.name || u.username || "Unknown";
     _currentMsgUsername = displayName;
 
-    document.getElementById("upmAvatar").textContent    = (displayName[0] || "?").toUpperCase();
+    // Avatar — show Telegram profile photo if stored, else initial letter
+    const upmAvatarEl = document.getElementById("upmAvatar");
+    if (u.photo_url) {
+      upmAvatarEl.innerHTML = `<img src="${u.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${(displayName[0] || '?').toUpperCase()}'" />`;
+      upmAvatarEl.style.padding = "0";
+      upmAvatarEl.style.overflow = "hidden";
+    } else {
+      upmAvatarEl.textContent = (displayName[0] || "?").toUpperCase();
+    }
     document.getElementById("upmName").textContent      = displayName;
     document.getElementById("upmUsername").textContent  = "@" + (u.username || "—");
     document.getElementById("upmId").textContent        = "Telegram ID: " + uid;
@@ -2497,7 +2518,9 @@ window.sendAdminMsg = sendAdminMsg;
 function openNotifInbox() {
   document.getElementById("notifOverlay").classList.add("active");
   document.getElementById("notifModal").classList.add("active");
-  markNotifsRead();
+  // Delay markNotifsRead so the onValue listener renders all messages first
+  // before Firebase re-fires from read:false→true updates (fixes missing messages bug)
+  setTimeout(markNotifsRead, 800);
 }
 window.openNotifInbox = openNotifInbox;
 
