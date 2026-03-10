@@ -2049,57 +2049,44 @@ function _listenDeposits() {
   });
 }
 
-async function _approveDeposit(reqKey, uid, amount) {
-  if (!confirm("ይህንን ዴፖዚት ማጽደቅ ይፈልጋሉ?")) return;
+async function _approveDeposit(key, uid, amount) {
+  if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
   try {
-    // 1. የአድሚን ጥያቄን ማጽደቅ
-    await update(ref(db, `depositRequests/${reqKey}`), { status: "approved" });
+    await update(ref(db, "depositRequests/" + key), { status: "approved" });
 
-    // 2. የተጠቃሚውን ባላንስ መጨመር (ወሳኙ ስህተት እዚህ ነበር)
-    const balanceRef = ref(db, `users/${uid}/balance`);
-    const snap = await get(balanceRef);
-    const currentBal = snap.exists() ? (Number(snap.val()) || 0) : 0;
-    await set(balanceRef, currentBal + Number(amount));
+    // Update user transaction
+    const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
+    if (txSnap.exists()) {
+      const upd = {};
+      txSnap.forEach(s => {
+        const t = s.val();
+        if (t.type === "deposit" && isPend(t.status) && t.amount === amount)
+          upd["users/" + uid + "/transactions/" + s.key + "/status"] = "approved";
+      });
+      if (Object.keys(upd).length) await update(ref(db), upd);
+    }
 
-    // 3. ለተጠቃሚው ማሳወቂያ መላክ
-    const notifRef = push(ref(db, `users/${uid}/notifications`));
-    await set(notifRef, {
-      from: "Alpha Bingo",
-      message: `የ ${amount} ETB ዴፖዚት ጥያቄዎ ተቀባይነት አግኝቷል! 💰`,
-      ts: serverTimestamp(),
-      read: false
-    });
+    // Credit balance
+    const balSnap = await get(ref(db, "users/" + uid + "/balance"));
+    const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
+    await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
 
-    toast("✅ ዴፖዚቱ ጸድቋል፤ ባላንስ ተጨምሯል!");
-    _loadAdminRequests(); // ዝርዝሩን ለማደስ
+    toast("✅ " + amount + " ETB approved! ሂሳቡ ወደ ተጠቃሚ ተጨምሯል");
   } catch (e) {
-    toast("❌ ስህተት: " + e.message);
+    console.error(e);
+    toast("❌ Error: " + e.message);
   }
 }
 
-
-    // 3. ባላንስ መጨመር
-    const balanceRef = ref(db, `users/${uid}/balance`);
-    const snap = await get(balanceRef);
-    const currentBal = snap.exists() ? (Number(snap.val()) || 0) : 0;
-    await set(balanceRef, currentBal + Number(amount));
-
-    // 4. ለተጠቃሚው ማሳወቂያ መላክ
-    const notifRef = push(ref(db, `users/${uid}/notifications`));
-    await set(notifRef, {
-      from: "Alpha Bingo",
-      message: `የ ${amount} ETB ዴፖዚት ጥያቄዎ ተቀባይነት አግኝቷል! 💰`,
-      ts: serverTimestamp(),
-      read: false
-    });
-
-    toast("✅ ተከናውኗል! ባላንስ ጨምሯል፣ ታሪኩም ተገቢ ሆኗል።");
-    _loadAdminRequests();
+async function _cancelDeposit(key) {
+  if (!confirm("ይህን deposit ሰርዝ?")) return;
+  try {
+    await update(ref(db, "depositRequests/" + key), { status: "cancelled" });
+    toast("❌ Deposit cancelled.");
   } catch (e) {
-    toast("❌ ስህተት: " + e.message);
+    toast("❌ Error: " + e.message);
   }
 }
-
 
 // ── Withdrawals ────────────────────────────────────────────────
 function _makeWdCard(item) {
@@ -2459,62 +2446,26 @@ function closeSendMsg() {
 }
 window.closeSendMsg = closeSendMsg;
 
-window.sendAdminMsg = async function() {
-  const text = $("smmText").value.trim();
-  // _currentMsgUid አድሚኑ የከፈተው የተጠቃሚ ID መሆኑን ያረጋግጣል
-  if (!text || !_currentMsgUid) {
-    toast("⚠ እባክዎ መልዕክት ይጻፉ!");
-    return;
-  }
-  
+async function sendAdminMsg() {
+  const text = document.getElementById("smmText").value.trim();
+  if (!text) { toast("⚠ ሜሴጁን ይጻፉ"); return; }
+  if (!_currentMsgUid) return;
+
   try {
-    const notifRef = push(ref(db, `users/${_currentMsgUid}/notifications`));
-    await set(notifRef, {
-      from: "Alpha Bingo Support",
+    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
+    await set(msgRef, {
+      from:    "Alpha Bingo Admin",
       message: text,
-      ts: serverTimestamp(),
-      read: false
+      read:    false,
+      ts:      serverTimestamp()
     });
-    
+    toast("✅ ሜሴጅ ተላልፏል!");
     closeSendMsg();
-    $("smmText").value = "";
-    toast("✅ መልዕክቱ ለተጠቃሚው ተልኳል!");
-  } catch (e) {
-    toast("❌ ስህተት: " + e.message);
+  } catch(e) {
+    toast("❌ Error: " + e.message);
   }
-};
-
-
-window.sendAdminMsg = async function() {
-  const text = $("smmText").value.trim();
-  
-  // _currentMsgUid አድሚኑ የመረጠው ተጠቃሚ ID መሆኑን ያረጋግጣል
-  if (!text || !_currentMsgUid) {
-    toast("⚠ እባክዎ መልዕክት ይጻፉ ወይም ተጠቃሚ ይምረጡ!");
-    return;
-  }
-  
-  try {
-    // በትክክለኛው የተጠቃሚ አድራሻ ላይ መጻፍ
-    const userNotifPath = `users/${_currentMsgUid}/notifications`;
-    const newMsgRef = push(ref(db, userNotifPath));
-    
-    await set(newMsgRef, {
-      from: "Alpha Bingo Admin",
-      message: text,
-      ts: serverTimestamp(),
-      read: false
-    });
-    
-    closeSendMsg();
-    $("smmText").value = ""; // ቦክሱን ማጽዳት
-    toast("✅ መልዕክቱ ለተጠቃሚው ደርሷል!");
-  } catch (e) {
-    console.error("Message Error:", e);
-    toast("❌ መልዕክት መላክ አልተቻለም: " + e.message);
-  }
-};
-
+}
+window.sendAdminMsg = sendAdminMsg;
 
 // ===== NOTIFICATION INBOX (for regular users) =====
 function openNotifInbox() {
