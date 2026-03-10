@@ -2504,8 +2504,6 @@ window.sendAdminMsg = sendAdminMsg;
 function closeNotifInbox() {
   document.getElementById("notifOverlay").classList.remove("active");
   document.getElementById("notifModal").classList.remove("active");
-  // small delay to avoid racing with onValue initial render
-  setTimeout(markNotifsRead, 400);
 }
 window.openNotifInbox = openNotifInbox;
 
