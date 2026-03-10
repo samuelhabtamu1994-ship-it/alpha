@@ -2055,13 +2055,26 @@ async function _approveDeposit(reqKey, uid, amount) {
     // 1. የአድሚን ጥያቄን ማጽደቅ
     await update(ref(db, `depositRequests/${reqKey}`), { status: "approved" });
 
-    // 2. የተጠቃሚውን ባላንስ መጨመር (ወሳኙ ስህተት እዚህ ነበር)
+    // 2. በተጠቃሚው ታሪክ (Transaction History) ውስጥ status መቀየር
+    const userTxRef = ref(db, `users/${uid}/transactions`);
+    const txSnap = await get(userTxRef);
+    if (txSnap.exists()) {
+      txSnap.forEach(child => {
+        const tx = child.val();
+        // መጠኑ የሚገጥመውን እና 'pending' የሆነውን ትራንዛክሽን ፈልጎ ማጽደቅ
+        if (tx.type === "deposit" && tx.status === "pending" && Number(tx.amount) === Number(amount)) {
+          update(ref(db, `users/${uid}/transactions/${child.key}`), { status: "approved" });
+        }
+      });
+    }
+
+    // 3. ባላንስ መጨመር
     const balanceRef = ref(db, `users/${uid}/balance`);
     const snap = await get(balanceRef);
     const currentBal = snap.exists() ? (Number(snap.val()) || 0) : 0;
     await set(balanceRef, currentBal + Number(amount));
 
-    // 3. ለተጠቃሚው ማሳወቂያ መላክ
+    // 4. ለተጠቃሚው ማሳወቂያ መላክ
     const notifRef = push(ref(db, `users/${uid}/notifications`));
     await set(notifRef, {
       from: "Alpha Bingo",
@@ -2070,8 +2083,8 @@ async function _approveDeposit(reqKey, uid, amount) {
       read: false
     });
 
-    toast("✅ ዴፖዚቱ ጸድቋል፤ ባላንስ ተጨምሯል!");
-    _loadAdminRequests(); // ዝርዝሩን ለማደስ
+    toast("✅ ተከናውኗል! ባላንስ ጨምሯል፣ ታሪኩም ተገቢ ሆኗል።");
+    _loadAdminRequests();
   } catch (e) {
     toast("❌ ስህተት: " + e.message);
   }
@@ -2467,11 +2480,34 @@ async function sendAdminMsg() {
 }
 window.sendAdminMsg = async function() {
   const text = $("smmText").value.trim();
-  // _currentMsgUid አድሚኑ የከፈተው የተጠቃሚ ID መሆኑን ያረጋግጣል
+  
+  // _currentMsgUid አድሚኑ የመረጠው ተጠቃሚ ID መሆኑን ያረጋግጣል
   if (!text || !_currentMsgUid) {
-    toast("⚠ እባክዎ መልዕክት ይጻፉ!");
+    toast("⚠ እባክዎ መልዕክት ይጻፉ ወይም ተጠቃሚ ይምረጡ!");
     return;
   }
+  
+  try {
+    // በትክክለኛው የተጠቃሚ አድራሻ ላይ መጻፍ
+    const userNotifPath = `users/${_currentMsgUid}/notifications`;
+    const newMsgRef = push(ref(db, userNotifPath));
+    
+    await set(newMsgRef, {
+      from: "Alpha Bingo Admin",
+      message: text,
+      ts: serverTimestamp(),
+      read: false
+    });
+    
+    closeSendMsg();
+    $("smmText").value = ""; // ቦክሱን ማጽዳት
+    toast("✅ መልዕክቱ ለተጠቃሚው ደርሷል!");
+  } catch (e) {
+    console.error("Message Error:", e);
+    toast("❌ መልዕክት መላክ አልተቻለም: " + e.message);
+  }
+};
+
   
   try {
     const notifRef = push(ref(db, `users/${_currentMsgUid}/notifications`));
