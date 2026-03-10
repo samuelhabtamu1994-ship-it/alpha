@@ -1,5 +1,5 @@
 // ==================================================================
-//  BARON BINGO — script.js
+//  BARON BINGO â€” script.js
 //  Full production Telegram Mini App logic with Firebase Realtime DB
 // ==================================================================
 
@@ -36,8 +36,8 @@ const UID = String(tgUser.id);
 // ===== CONSTANTS =====
 const JOIN_SEC  = 30;
 const CALL_MS   = 3500;   // ms between number calls
-const MAX_CALLS = 20;     // max calls per game — 20 × 3.5s = 70s
-// GAME_SEC must cover full game: MAX_CALLS × CALL_MS/1000 + buffer
+const MAX_CALLS = 20;     // max calls per game â€” 20 Ã— 3.5s = 70s
+// GAME_SEC must cover full game: MAX_CALLS Ã— CALL_MS/1000 + buffer
 const GAME_SEC  = 90;     // 70s game + 20s buffer = 90s
 const COMMISSION = 0.10;  // 10%
 const MIN_REAL   = 1;     // minimum real players to start
@@ -51,10 +51,10 @@ const BOT_NAMES = [
 ];
 
 const STAKE_CONFIG = [
-  { amount: 10,  theme: "sc-gold",   icon: "🎯", min: 7,  max: 18 },
-  { amount: 20,  theme: "sc-green",  icon: "🎲", min: 5,  max: 15 },
-  { amount: 50,  theme: "sc-cyan",   icon: "💎", min: 3,  max: 10 },
-  { amount: 100, theme: "sc-purple", icon: "👑", min: 4,  max: 12 }
+  { amount: 10,  theme: "sc-gold",   icon: "ðŸŽ¯", min: 7,  max: 18 },
+  { amount: 20,  theme: "sc-green",  icon: "ðŸŽ²", min: 5,  max: 15 },
+  { amount: 50,  theme: "sc-cyan",   icon: "ðŸ’Ž", min: 3,  max: 10 },
+  { amount: 100, theme: "sc-purple", icon: "ðŸ‘‘", min: 4,  max: 12 }
 ];
 
 // ===== STATE =====
@@ -128,7 +128,7 @@ function toast(msg, dur = 2800) {
 function copyPhone() {
   const num = $("depositPhone").textContent;
   navigator.clipboard?.writeText(num)
-    .then(() => toast("✅ ቁጥሩ ተገልብጧል!"))
+    .then(() => toast("âœ… á‰áŒ¥áˆ© á‰°áŒˆáˆá‰¥áŒ§áˆ!"))
     .catch(() => { /* fallback */ });
 }
 window.copyPhone = copyPhone;
@@ -223,14 +223,14 @@ function buildStakeGrid() {
       <div class="sc-meta">
         <div class="sc-players">
           <span class="sc-live-dot" ${isNP ? 'style="background:#555;box-shadow:none;animation:none"' : ''}></span>
-          <span><span id="sp-${cfg.amount}">${isNP ? 0 : 0}</span> ተጫዋቾች</span>
+          <span><span id="sp-${cfg.amount}">${isNP ? 0 : 0}</span> á‰°áŒ«á‹‹á‰¾á‰½</span>
         </div>
-        <div class="sc-prize">🏆 <span class="sc-prize-val" id="sw-${cfg.amount}">${isNP ? 0 : 0}</span> ETB</div>
+        <div class="sc-prize">ðŸ† <span class="sc-prize-val" id="sw-${cfg.amount}">${isNP ? 0 : 0}</span> ETB</div>
         ${isNP
-          ? `<div class="sc-no-players-label">ተጫዋች የለም</div>`
+          ? `<div class="sc-no-players-label">á‰°áŒ«á‹‹á‰½ á‹¨áˆˆáˆ</div>`
           : `<div class="sc-phase phase-join" id="sph-${cfg.amount}">
                <span class="sc-phase-dot"></span>
-               <span id="sphl-${cfg.amount}">መቀላቀል ይቻላል</span>
+               <span id="sphl-${cfg.amount}">áˆ˜á‰€áˆ‹á‰€áˆ á‹­á‰»áˆ‹áˆ</span>
              </div>
              <div class="sc-timer">
                <div class="sc-timer-bar"><div class="sc-timer-fill tf-join" id="stf-${cfg.amount}" style="width:100%"></div></div>
@@ -242,7 +242,7 @@ function buildStakeGrid() {
 
     card.addEventListener("click", () => {
       if (isNP) {
-        toast("⚠ ይህ stake ላይ ገና ተጫዋቾች የሉም");
+        toast("âš  á‹­áˆ… stake áˆ‹á‹­ áŒˆáŠ“ á‰°áŒ«á‹‹á‰¾á‰½ á‹¨áˆ‰áˆ");
         return;
       }
       showCardSelection(cfg.amount);
@@ -269,7 +269,7 @@ function startCycleEngine() {
       st.phase   = synced.phase;
       st.elapsed = synced.elapsed;
 
-      // Detect phase transition: started → join (game ended, new cycle)
+      // Detect phase transition: started â†’ join (game ended, new cycle)
       if (wasStarted && st.phase === "join") {
         resetPlayerCount(cfg.amount, cfg.min);
       }
@@ -287,29 +287,29 @@ function updateStakeCycleUI(amount) {
   const tv  = $(`stv-${amount}`);
   if (!ph) return;
 
-  // Only fluctuate during join phase — freeze count when game has started
+  // Only fluctuate during join phase â€” freeze count when game has started
   const displayedCountBefore = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
   if (st.phase === "join" && Math.random() < 0.25) fluctuatePlayers(amount);
   const displayedCount = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
 
-  // If 0 or 1 player showing — freeze timer at 30s, never show "started"
+  // If 0 or 1 player showing â€” freeze timer at 30s, never show "started"
   if (displayedCount <= 1) {
     ph.className    = "sc-phase phase-join";
-    lbl.textContent = "መቀላቀል ይቻላል";
+    lbl.textContent = "áˆ˜á‰€áˆ‹á‰€áˆ á‹­á‰»áˆ‹áˆ";
     tf.className    = "sc-timer-fill tf-join";
     tf.style.width  = "100%";
     tv.textContent  = "30s";
   } else if (st.phase === "join") {
     const rem = JOIN_SEC - st.elapsed;
     ph.className    = "sc-phase phase-join";
-    lbl.textContent = "መቀላቀል ይቻላል";
+    lbl.textContent = "áˆ˜á‰€áˆ‹á‰€áˆ á‹­á‰»áˆ‹áˆ";
     tf.className    = "sc-timer-fill tf-join";
     tf.style.width  = ((rem / JOIN_SEC) * 100) + "%";
     tv.textContent  = rem + "s";
   } else {
     const rem = GAME_SEC - st.elapsed;
     ph.className    = "sc-phase phase-started";
-    lbl.textContent = "ጨዋታ ጀምሯል";
+    lbl.textContent = "áŒ¨á‹‹á‰³ áŒ€áˆáˆ¯áˆ";
     tf.className    = "sc-timer-fill tf-started";
     tf.style.width  = ((rem / GAME_SEC) * 100) + "%";
     tv.textContent  = rem + "s";
@@ -321,7 +321,7 @@ function updateStakeCycleUI(amount) {
   }
 }
 
-// Cache bot display max per stake — re-rolls once per cycle window
+// Cache bot display max per stake â€” re-rolls once per cycle window
 const _botDisplayCache = {};
 function getBotDisplayMax(amount) {
   if (amount === 10) return 18;  // always active, max 18
@@ -360,7 +360,7 @@ function getBotDisplayMax(amount) {
 }
 
 function isBotDisplayActive(amount) {
-  // Legacy helper — returns true if bots can show at all right now
+  // Legacy helper â€” returns true if bots can show at all right now
   if (amount === 10) return true;
   if (amount === 20) return true;   // fluctuatePlayers will randomly zero out
   if (amount === 50) return true;   // fluctuatePlayers will randomly zero out
@@ -426,11 +426,11 @@ async function showCardSelection(amount) {
   pickedCardNo = 0; // 0 = no card selected yet
   showScreen("screen-card");
 
-  // Show "ካርድ ይምረጡ" state immediately before async load
+  // Show "áŠ«áˆ­á‹µ á‹­áˆáˆ¨áŒ¡" state immediately before async load
   const btn = $("startGameBtn");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "👆 ካርድ ይምረጡ";
+    btn.textContent = "ðŸ‘† áŠ«áˆ­á‹µ á‹­áˆáˆ¨áŒ¡";
     btn.style.opacity = "0.5";
     btn.style.cursor = "not-allowed";
     btn.onclick = null;
@@ -438,7 +438,7 @@ async function showCardSelection(amount) {
   // Clear preview
   const preview = $("bingoPreview");
   if (preview) preview.innerHTML = "";
-  $("cpLabel").textContent = "ካርድ አልተመረጠም";
+  $("cpLabel").textContent = "áŠ«áˆ­á‹µ áŠ áˆá‰°áˆ˜áˆ¨áŒ áˆ";
 
   await loadTakenCards(amount);
   renderCardPicker();
@@ -448,7 +448,7 @@ window.goHome = () => {
   const btn = $("startGameBtn");
   if (btn) {
     btn.disabled = false;
-    btn.textContent = "🎮 ጨዋታውን ጀምር";
+    btn.textContent = "ðŸŽ® áŒ¨á‹‹á‰³á‹áŠ• áŒ€áˆáˆ­";
     btn.style.opacity = "1";
     btn.style.cursor = "pointer";
   }
@@ -460,7 +460,7 @@ function enableStartBtn() {
   if (!btn) return;
   if (pickedCardNo === 0) {
     btn.disabled = true;
-    btn.textContent = "👆 ካርድ ይምረጡ";
+    btn.textContent = "ðŸ‘† áŠ«áˆ­á‹µ á‹­áˆáˆ¨áŒ¡";
     btn.style.opacity = "0.5";
     btn.style.cursor = "not-allowed";
     btn.onclick = null;
@@ -468,17 +468,17 @@ function enableStartBtn() {
   }
   const st = cycleState[selectedStake];
   // Only block if cycle is "started" AND displayed player count > 1
-  // (if count is 0 or 1 no real game is running — always allow joining)
+  // (if count is 0 or 1 no real game is running â€” always allow joining)
   const displayedCount = parseInt((document.getElementById("sp-" + selectedStake) || {}).textContent) || 0;
   if (st && st.phase === "started" && displayedCount > 1) {
     btn.disabled = true;
-    btn.textContent = "⏳ ጨዋታ እየተካሄደ ነው... ይጠብቁ";
+    btn.textContent = "â³ áŒ¨á‹‹á‰³ áŠ¥á‹¨á‰°áŠ«áˆ„á‹° áŠá‹... á‹­áŒ á‰¥á‰";
     btn.style.opacity = "0.55";
     btn.style.cursor = "not-allowed";
     btn.onclick = null;
   } else {
     btn.disabled = false;
-    btn.textContent = "🎮 ጨዋታውን ጀምር";
+    btn.textContent = "ðŸŽ® áŒ¨á‹‹á‰³á‹áŠ• áŒ€áˆáˆ­";
     btn.style.opacity = "1";
     btn.style.cursor = "pointer";
     btn.onclick = joinGame;
@@ -492,24 +492,24 @@ function updateStartBtn(amount) {
   if (!st) return;
   if (pickedCardNo === 0) {
     btn.disabled = true;
-    btn.textContent = "👆 ካርድ ይምረጡ";
+    btn.textContent = "ðŸ‘† áŠ«áˆ­á‹µ á‹­áˆáˆ¨áŒ¡";
     btn.style.opacity = "0.5";
     btn.style.cursor  = "not-allowed";
     btn.onclick = null;
     return;
   }
   // Only block if cycle is "started" AND displayed player count > 1
-  // (if count is 0 or 1 no real game is running — always allow joining)
+  // (if count is 0 or 1 no real game is running â€” always allow joining)
   const displayedCount = parseInt((document.getElementById("sp-" + amount) || {}).textContent) || 0;
   if (st.phase === "started" && displayedCount > 1) {
     btn.disabled = true;
-    btn.textContent = "⏳ ጨዋታ እየተካሄደ ነው... ይጠብቁ";
+    btn.textContent = "â³ áŒ¨á‹‹á‰³ áŠ¥á‹¨á‰°áŠ«áˆ„á‹° áŠá‹... á‹­áŒ á‰¥á‰";
     btn.style.opacity = "0.55";
     btn.style.cursor  = "not-allowed";
     btn.onclick = null;
   } else {
     btn.disabled = false;
-    btn.textContent = "🎮 ጨዋታውን ጀምር";
+    btn.textContent = "ðŸŽ® áŒ¨á‹‹á‰³á‹áŠ• áŒ€áˆáˆ­";
     btn.style.opacity = "1";
     btn.style.cursor  = "pointer";
     btn.onclick = joinGame;
@@ -581,7 +581,7 @@ function renderPreview(seed) {
   nums.forEach((n, i) => {
     const cell = document.createElement("div");
     cell.className = "bp-cell" + (i === 12 ? " bp-free" : "");
-    cell.textContent = i === 12 ? "⭐" : n;
+    cell.textContent = i === 12 ? "â­" : n;
     grid.appendChild(cell);
   });
 }
@@ -630,9 +630,9 @@ function shuffleArr(arr) {
 let _joiningGame = false; // prevent double-tap
 
 async function joinGame() {
-  if (_joiningGame) return; // already joining — ignore extra taps
+  if (_joiningGame) return; // already joining â€” ignore extra taps
   if (userBalance < selectedStake) {
-    toast("⚠ ቀሪ ሂሳብዎ አነስተኛ ነው! Deposit ያድርጉ");
+    toast("âš  á‰€áˆª áˆ‚áˆ³á‰¥á‹Ž áŠ áŠáˆµá‰°áŠ› áŠá‹! Deposit á‹«á‹µáˆ­áŒ‰");
     return;
   }
 
@@ -641,7 +641,7 @@ async function joinGame() {
   const btn = $("startGameBtn");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "⏳ በመጫን ላይ...";
+    btn.textContent = "â³ á‰ áˆ˜áŒ«áŠ• áˆ‹á‹­...";
     btn.style.opacity = "0.7";
     btn.style.cursor = "not-allowed";
   }
@@ -691,11 +691,11 @@ async function joinGame() {
     _joiningGame = false;
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "🎮 ጨዋታውን ጀምር";
+      btn.textContent = "ðŸŽ® áŒ¨á‹‹á‰³á‹áŠ• áŒ€áˆáˆ­";
       btn.style.opacity = "1";
       btn.style.cursor = "pointer";
     }
-    toast("❌ ስህተት ተፈጥሯል። እንደገና ይሞክሩ");
+    toast("âŒ áˆµáˆ…á‰°á‰µ á‰°áˆáŒ¥áˆ¯áˆá¢ áŠ¥áŠ•á‹°áŒˆáŠ“ á‹­áˆžáŠ­áˆ©");
   }
 }
 window.joinGame = joinGame;
@@ -737,11 +737,11 @@ async function findOrCreateRoom(stake) {
     calledNumbers: []
   });
 
-  // Short wait then re-scan — if another room appeared in parallel, join that instead
+  // Short wait then re-scan â€” if another room appeared in parallel, join that instead
   await new Promise(r => setTimeout(r, 800));
   const concurrent = await scanForRoom();
   if (concurrent && concurrent !== roomId) {
-    // Another room opened — remove ours and join theirs
+    // Another room opened â€” remove ours and join theirs
     await remove(ref(db, `rooms/${roomId}`));
     isHost = false;
     return concurrent;
@@ -828,26 +828,26 @@ function calcBotsNeeded(stake, realCount) {
   if (realCount === 1) return 4;
 
   if (stake === 20) {
-    // 40% chance = 0 bots, 60% chance = 1–10 bots
+    // 40% chance = 0 bots, 60% chance = 1â€“10 bots
     if (rnd < 0.40) return 0;
-    return Math.floor(Math.random() * 10) + 1; // 1–10
+    return Math.floor(Math.random() * 10) + 1; // 1â€“10
   }
 
   if (stake === 50) {
-    // 60% chance = 0 bots, 40% chance = 1–6 bots
+    // 60% chance = 0 bots, 40% chance = 1â€“6 bots
     if (rnd < 0.60) return 0;
-    return Math.floor(Math.random() * 6) + 1; // 1–6
+    return Math.floor(Math.random() * 6) + 1; // 1â€“6
   }
 
   if (stake === 100) {
-    // Only between 18:00–21:30 local time: 0–3 bots, else 0
+    // Only between 18:00â€“21:30 local time: 0â€“3 bots, else 0
     const now = new Date();
     const h = now.getHours();
     const m = now.getMinutes();
     const afterStart  = h > 18 || (h === 18 && m >= 0);
     const beforeEnd   = h < 21 || (h === 21 && m <= 30);
     if (afterStart && beforeEnd) {
-      return Math.floor(Math.random() * 4); // 0–3
+      return Math.floor(Math.random() * 4); // 0â€“3
     }
     return 0;
   }
@@ -865,7 +865,7 @@ function scheduleGameStart(roomId, room) {
   async function launchWhenReady() {
     if (!startScheduled) return;
 
-    // Fetch fresh room data — reset & bail on any error
+    // Fetch fresh room data â€” reset & bail on any error
     let freshRoom;
     try {
       const freshSnap = await get(ref(db, `rooms/${roomId}`));
@@ -877,7 +877,7 @@ function scheduleGameStart(roomId, room) {
       return;
     }
 
-    // Someone else already started — nothing to do
+    // Someone else already started â€” nothing to do
     if (freshRoom.status === "playing") {
       startScheduled = false; startScheduledRoomId = null;
       return;
@@ -886,14 +886,14 @@ function scheduleGameStart(roomId, room) {
     const deadline = freshRoom.joinDeadline || (Date.now() + JOIN_SEC * 1000);
     const remainMs = deadline - Date.now();
 
-    // Time remaining — come back closer to deadline
+    // Time remaining â€” come back closer to deadline
     if (remainMs > 500) {
       setTimeout(launchWhenReady, Math.min(remainMs, 2000));
       return;
     }
 
-    // ── Deadline reached ────────────────────────────────────────
-    // 1. Add bots immediately (fire-and-forget style — don't block game start)
+    // â”€â”€ Deadline reached â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // 1. Add bots immediately (fire-and-forget style â€” don't block game start)
     const realNow    = freshRoom.players
       ? Object.values(freshRoom.players).filter(p => !p.isBot).length
       : 0;
@@ -917,12 +917,12 @@ function scheduleGameStart(roomId, room) {
         };
         bots.push(botUpdates[botId]);
       }
-      // Add bots in parallel with game start — don't await so it never blocks
+      // Add bots in parallel with game start â€” don't await so it never blocks
       update(ref(db, `rooms/${roomId}/players`), botUpdates)
         .catch(e => console.error("[scheduleGameStart] bot add error:", e));
     }
 
-    // 2. Write "playing" immediately — retries up to 3 times on failure
+    // 2. Write "playing" immediately â€” retries up to 3 times on failure
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await update(ref(db, `rooms/${roomId}`), {
@@ -942,7 +942,7 @@ function scheduleGameStart(roomId, room) {
       }
     }
 
-    // All 3 attempts failed — reset flag so the next Firebase event can retry
+    // All 3 attempts failed â€” reset flag so the next Firebase event can retry
     console.error("[scheduleGameStart] all write attempts failed, resetting flag");
     startScheduled = false; startScheduledRoomId = null;
   }
@@ -969,7 +969,7 @@ function updateLobbyUI(players, stake) {
   real.forEach(p => {
     const chip = document.createElement("div");
     chip.className = "lp-chip lp-real";
-    chip.textContent = (p.uid === UID ? "⭐ " : "") + p.username;
+    chip.textContent = (p.uid === UID ? "â­ " : "") + p.username;
     wrap.appendChild(chip);
   });
   bots.slice(0, 5).forEach(p => {
@@ -1008,8 +1008,8 @@ function showGameScreenWaiting() {
     `;
     overlay.innerHTML = `
       <div style="width:56px;height:56px;border:4px solid #ffd700;border-top-color:transparent;border-radius:50%;animation:spin 0.9s linear infinite;"></div>
-      <div style="font-family:var(--font-am);font-size:1.1rem;color:#ffd700;font-weight:700;" id="gwolTitle">ተጫዋቾችን በመጠበቅ ላይ...</div>
-      <div style="font-family:var(--font-am);font-size:0.85rem;color:#aaa;" id="gwolSub">ጨዋታ እስኪጀምር ይጠብቁ...</div>
+      <div style="font-family:var(--font-am);font-size:1.1rem;color:#ffd700;font-weight:700;" id="gwolTitle">á‰°áŒ«á‹‹á‰¾á‰½áŠ• á‰ áˆ˜áŒ á‰ á‰… áˆ‹á‹­...</div>
+      <div style="font-family:var(--font-am);font-size:0.85rem;color:#aaa;" id="gwolSub">áŒ¨á‹‹á‰³ áŠ¥áˆµáŠªáŒ€áˆáˆ­ á‹­áŒ á‰¥á‰...</div>
       <div style="font-size:2rem;font-weight:900;color:#fff;font-family:var(--font-main);" id="gwolTimer">30</div>
 
     `;
@@ -1033,10 +1033,10 @@ function startWaitingCountdown() {
 
     if (remMs > 0) {
       timerEl.textContent = remSec;
-      titleEl.textContent = "ተጫዋቾችን በመጠበቅ ላይ...";
-      subEl.textContent   = "ጨዋታ ሲጀምር ወዲያው ይነግርዎታል...";
+      titleEl.textContent = "á‰°áŒ«á‹‹á‰¾á‰½áŠ• á‰ áˆ˜áŒ á‰ á‰… áˆ‹á‹­...";
+      subEl.textContent   = "áŒ¨á‹‹á‰³ áˆ²áŒ€áˆáˆ­ á‹ˆá‹²á‹«á‹ á‹­áŠáŒáˆ­á‹Žá‰³áˆ...";
     } else {
-      // ── Countdown hit 0 ─────────────────────────────────────
+      // â”€â”€ Countdown hit 0 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       clearInterval(_waitCountdownInt);
       _waitCountdownInt = null;
       timerEl.textContent = "0";
@@ -1049,18 +1049,18 @@ function startWaitingCountdown() {
         const r = snap.val();
 
         if (r.status === "playing") {
-          // Already playing — show board immediately
+          // Already playing â€” show board immediately
           hideGameWaitingOverlay();
           if (!gameUIInitialized) { gameUIInitialized = true; startGameUI(r); }
           syncCalledNumbers(r.calledNumbers || []);
 
         } else if (r.joinDeadline && r.joinDeadline > Date.now()) {
-          // Host pushed deadline — restart countdown with new value
+          // Host pushed deadline â€” restart countdown with new value
           currentRoomJoinDeadline = r.joinDeadline;
           startWaitingCountdown();
 
         } else {
-          // ── BACKUP HOST LOGIC ──────────────────────────────
+          // â”€â”€ BACKUP HOST LOGIC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           // Status is still "waiting" and deadline has passed.
           // Any player (not just the host) attempts to start the game.
           // This handles the case where the original host disconnected.
@@ -1092,7 +1092,7 @@ function startWaitingCountdown() {
                 .catch(e => console.error("[backup] bot add error:", e));
             }
 
-            // Write "playing" — retry up to 3 times
+            // Write "playing" â€” retry up to 3 times
             (async () => {
               for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
@@ -1116,7 +1116,7 @@ function startWaitingCountdown() {
           }
 
           // While backup host is writing, keep polling so UI reacts as soon as
-          // Firebase fires — either from this client or the original host
+          // Firebase fires â€” either from this client or the original host
           (function pollUntilPlaying() {
             if (!currentRoomId) return;
             get(ref(db, `rooms/${currentRoomId}`))
@@ -1152,7 +1152,7 @@ function hideGameWaitingOverlay() {
 function cancelLobby() {
   if (roomListener) { roomListener(); roomListener = null; }
   if (currentRoomId) {
-    // FIX 6: Remove player from room but NO refund — stake is forfeited
+    // FIX 6: Remove player from room but NO refund â€” stake is forfeited
     remove(ref(db, `rooms/${currentRoomId}/players/${UID}`));
   }
   hideGameWaitingOverlay();
@@ -1160,7 +1160,7 @@ function cancelLobby() {
   currentRoomId  = null;
   isHost = false;
   showScreen("screen-home");
-  toast("🚪 ጨዋታ ተሰርዟል።");
+  toast("ðŸšª áŒ¨á‹‹á‰³ á‰°áˆ°áˆ­á‹Ÿáˆá¢");
 }
 window.cancelLobby = cancelLobby;
 
@@ -1170,7 +1170,7 @@ function startGameUI(room) {
   const players = room.players ? Object.values(room.players) : [];
 
   $("gtbRound").textContent   = "Stake: " + room.stake + " ETB";
-  $("gtbPlayers").textContent = "👥 " + players.length;
+  $("gtbPlayers").textContent = "ðŸ‘¥ " + players.length;
 
   // FIX 2: Fetch fresh room data to get all players including bots for accurate prize
   get(ref(db, `rooms/${currentRoomId}`)).then(snap => {
@@ -1178,8 +1178,8 @@ function startGameUI(room) {
     const freshRoom = snap.val();
     const allPlayers = freshRoom.players ? Object.values(freshRoom.players) : [];
     const prize = calcPrize(allPlayers.length, freshRoom.stake);
-    $("gtbPrize").textContent   = "🏆 " + prize + " ETB";
-    $("gtbPlayers").textContent = "👥 " + allPlayers.length;
+    $("gtbPrize").textContent   = "ðŸ† " + prize + " ETB";
+    $("gtbPlayers").textContent = "ðŸ‘¥ " + allPlayers.length;
     renderPlayersStrip(allPlayers);
   });
 
@@ -1192,7 +1192,7 @@ function startGameUI(room) {
   // Players strip (initial render, updated above after fetch)
   renderPlayersStrip(players);
 
-  // Determine host from room data (reliable — not from local isHost flag)
+  // Determine host from room data (reliable â€” not from local isHost flag)
   if (room.hostUid === UID) {
     isHost = true;
     startCallerLoop(currentRoomId);
@@ -1226,7 +1226,7 @@ function buildCalledGrid() {
   ];
 
   // Build row by row: first row = headers, then 15 rows of numbers
-  // Grid is 5 columns × 16 rows (1 header + 15 numbers)
+  // Grid is 5 columns Ã— 16 rows (1 header + 15 numbers)
   for (let row = 0; row < 16; row++) {
     cols.forEach(col => {
       if (row === 0) {
@@ -1361,7 +1361,7 @@ function manualDaub(idx) {
       cell.classList.add("gc-daubed");
       if (checkBingo(daubedSet)) $("bingoShoutBtn").classList.add("ready");
     } else {
-      toast("⚠ ይህ ቁጥር ገና አልተጠራም!");
+      toast("âš  á‹­áˆ… á‰áŒ¥áˆ­ áŒˆáŠ“ áŠ áˆá‰°áŒ áˆ«áˆ!");
     }
   });
 }
@@ -1415,13 +1415,13 @@ function getWinCells(daubed) {
 // ===== SHOUT BINGO =====
 async function shoutBingo() {
   if (!checkBingo(daubedSet)) {
-    toast("⚠ ገና ቢንጎ አልሆነም! ቁጥሮችዎ ገና አልተዛመዱም");
+    toast("âš  áŒˆáŠ“ á‰¢áŠ•áŒŽ áŠ áˆáˆ†áŠáˆ! á‰áŒ¥áˆ®á‰½á‹Ž áŒˆáŠ“ áŠ áˆá‰°á‹›áˆ˜á‹±áˆ");
     return;
   }
   const snap = await get(ref(db, `rooms/${currentRoomId}`));
   if (!snap.exists()) return;
   const room = snap.val();
-  if (room.winner) { toast("😞 ቀድሞ አሸናፊ ተወስኗል!"); return; }
+  if (room.winner) { toast("ðŸ˜ž á‰€á‹µáˆž áŠ áˆ¸áŠ“áŠ á‰°á‹ˆáˆµáŠ—áˆ!"); return; }
 
   const players = room.players ? Object.values(room.players) : [];
   const prize   = calcPrize(players.length, room.stake);
@@ -1484,7 +1484,7 @@ function checkBotBingo(room, calledNumbers, roomId) {
   }
 }
 
-// Force winner when 20 calls reached — picks real player or best bot
+// Force winner when 20 calls reached â€” picks real player or best bot
 async function forceWinnerAt20(room, roomId) {
   const players    = Object.values(room.players || {});
   const called     = room.calledNumbers || [];
@@ -1539,21 +1539,21 @@ function showResultScreen(won, amount, winnerName) {
   const el_sub    = $("resultSub");
 
   if (won) {
-    el_emoji.textContent  = "🏆";
-    el_title.textContent  = "አሸነፉ!";
+    el_emoji.textContent  = "ðŸ†";
+    el_title.textContent  = "áŠ áˆ¸áŠá‰!";
     el_title.className    = "result-title";
     el_amount.textContent = "+" + amount + " ETB";
     el_amount.className   = "result-amount";
     el_winner.textContent = "Winner: " + winnerName;
-    el_sub.textContent    = "ሽልማቱ ወደ ሂሳብዎ ተጨምሯል";
+    el_sub.textContent    = "áˆ½áˆáˆ›á‰± á‹ˆá‹° áˆ‚áˆ³á‰¥á‹Ž á‰°áŒ¨áˆáˆ¯áˆ";
   } else {
-    el_emoji.textContent  = "😞";
-    el_title.textContent  = "አልተሳካም";
+    el_emoji.textContent  = "ðŸ˜ž";
+    el_title.textContent  = "áŠ áˆá‰°áˆ³áŠ«áˆ";
     el_title.className    = "result-title loss";
     el_amount.textContent = "-" + amount + " ETB";
     el_amount.className   = "result-amount loss";
     el_winner.textContent = "Winner: " + winnerName;
-    el_sub.textContent    = "ሌላ ተጫዋች አሸንፏል። እንደገና ይሞክሩ!";
+    el_sub.textContent    = "áˆŒáˆ‹ á‰°áŒ«á‹‹á‰½ áŠ áˆ¸áŠ•ááˆá¢ áŠ¥áŠ•á‹°áŒˆáŠ“ á‹­áˆžáŠ­áˆ©!";
   }
 
   showScreen("screen-result");
@@ -1591,12 +1591,12 @@ function leaveGame() {
       border-radius:18px; padding:28px 24px; max-width:280px; width:90%;
       text-align:center; box-shadow:0 8px 40px rgba(0,0,0,0.7);
     ">
-      <div style="font-size:2rem; margin-bottom:10px;">⚠️</div>
+      <div style="font-size:2rem; margin-bottom:10px;">âš ï¸</div>
       <div style="font-family:var(--font-am); font-size:1rem; font-weight:700; color:#fff; margin-bottom:8px;">
-        ጨዋታውን ለቀው መውጣት ይፈልጋሉ?
+        áŒ¨á‹‹á‰³á‹áŠ• áˆˆá‰€á‹ áˆ˜á‹áŒ£á‰µ á‹­áˆáˆáŒ‹áˆ‰?
       </div>
       <div style="font-family:var(--font-am); font-size:0.78rem; color:#aaa; margin-bottom:22px;">
-        ጨዋታው ይቀጥላል፣ ግን ሂሳብዎ አይመለስም።
+        áŒ¨á‹‹á‰³á‹ á‹­á‰€áŒ¥áˆ‹áˆá£ áŒáŠ• áˆ‚áˆ³á‰¥á‹Ž áŠ á‹­áˆ˜áˆˆáˆµáˆá¢
       </div>
       <div style="display:flex; gap:12px; justify-content:center;">
         <button id="leaveConfirmYes" style="
@@ -1604,14 +1604,14 @@ function leaveGame() {
           background:linear-gradient(135deg,#ff4444,#ff1744);
           color:#fff; font-weight:800; font-size:0.9rem;
           border:none; cursor:pointer;
-        ">አዎ፣ ውጣ</button>
+        ">áŠ á‹Žá£ á‹áŒ£</button>
         <button id="leaveConfirmNo" style="
           flex:1; padding:12px; border-radius:10px;
           background:rgba(255,255,255,0.08);
           border:1px solid rgba(255,255,255,0.15);
           color:#fff; font-weight:800; font-size:0.9rem;
           cursor:pointer;
-        ">አይ፣ ቀጥል</button>
+        ">áŠ á‹­á£ á‰€áŒ¥áˆ</button>
       </div>
     </div>
   `;
@@ -1624,7 +1624,7 @@ function leaveGame() {
     }
     cleanupGame();
     showScreen("screen-home");
-    toast("🚪 ጨዋታውን ለቅቀዋል");
+    toast("ðŸšª áŒ¨á‹‹á‰³á‹áŠ• áˆˆá‰…á‰€á‹‹áˆ");
   };
   document.getElementById("leaveConfirmNo").onclick = () => {
     overlay.remove();
@@ -1637,8 +1637,8 @@ async function submitDeposit() {
   const amt = parseFloat($("depAmount").value);
   const sms = $("depSms").value.trim();
 
-  if (!amt || amt < 50) { toast("⚠ ቢያንስ 50 ETB ያስገቡ!"); return; }
-  if (!sms) { toast("⚠ SMS ማረጋገጫ ያስፈልጋል!"); return; }
+  if (!amt || amt < 50) { toast("âš  á‰¢á‹«áŠ•áˆµ 50 ETB á‹«áˆµáŒˆá‰¡!"); return; }
+  if (!sms) { toast("âš  SMS áˆ›áˆ¨áŒ‹áŒˆáŒ« á‹«áˆµáˆáˆáŒ‹áˆ!"); return; }
 
   // Save pending request to Firebase
   const txRef = push(ref(db, `users/${UID}/transactions`));
@@ -1666,12 +1666,12 @@ async function submitDeposit() {
 
   $("depAmount").value = "";
   $("depSms").value = "";
-  toast("✅ ጥያቄዎ ተልኳል! ከ admin ማረጋገጫ ይጠብቁ");
+  toast("âœ… áŒ¥á‹«á‰„á‹Ž á‰°áˆáŠ³áˆ! áŠ¨ admin áˆ›áˆ¨áŒ‹áŒˆáŒ« á‹­áŒ á‰¥á‰");
   loadDepositHistory();
 }
 window.submitDeposit = submitDeposit;
 
-// Single persistent listener — started once at app init, never re-created
+// Single persistent listener â€” started once at app init, never re-created
 let _depHistStarted = false;
 
 function fmtDate(ts) {
@@ -1680,46 +1680,92 @@ function fmtDate(ts) {
   const p = n => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function loadDepositHistory() {
-  if (_depHistStarted) return; // already listening
+
+// Single shared listener for all user transactions (deposit + withdraw history)
+function _startTransactionListener() {
+  if (_depHistStarted) return;
   _depHistStarted = true;
   onValue(ref(db, `users/${UID}/transactions`), snap => {
-    const container = $("depositHistory");
-    if (!container) return;
-    container.innerHTML = "";
-    if (!snap.exists()) return;
-    const txs = [];
-    snap.forEach(child => { txs.push({ ...child.val(), key: child.key }); });
-    txs.filter(t => t.type === "deposit")
-       .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-       .slice(0, 8)
-       .forEach(t => {
-         const el = document.createElement("div");
-         const depDate = fmtDate(t.ts);
-         el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : ""}`;
-         el.innerHTML = `
-           <div class="hist-label">📥 Deposit
-             ${depDate ? `<div class="hist-date">${depDate}</div>` : ""}
-           </div>
-           <div class="hist-right">
-             <div class="hist-amount pos">+${t.amount} ETB</div>
-             ${t.status === "pending"
-               ? `<div class="hist-status">⏳ Pending...</div>`
-               : `<div class="hist-status" style="color:var(--green)">✅ Approved</div>`}
-           </div>
-         `;
-         container.appendChild(el);
-       });
+    // Update deposit history container if visible
+    const depContainer = $("depositHistory");
+    if (depContainer) {
+      depContainer.innerHTML = "";
+      if (snap.exists()) {
+        const txs = [];
+        snap.forEach(child => { txs.push({ ...child.val(), key: child.key }); });
+        txs.filter(t => t.type === "deposit")
+           .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+           .slice(0, 8)
+           .forEach(t => {
+             const el = document.createElement("div");
+             const depDate = fmtDate(t.ts);
+             el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : t.status === "cancelled" ? "hist-cancelled" : ""}`;
+             el.innerHTML = `
+               <div class="hist-label">ðŸ“¥ Deposit
+                 ${depDate ? `<div class="hist-date">${depDate}</div>` : ""}
+               </div>
+               <div class="hist-right">
+                 <div class="hist-amount pos">+${t.amount} ETB</div>
+                 ${t.status === "pending"
+                   ? `<div class="hist-status">â³ Pending...</div>`
+                   : t.status === "cancelled"
+                   ? `<div class="hist-status" style="color:#ff4444">âŒ Cancelled</div>`
+                   : `<div class="hist-status" style="color:var(--green)">âœ… Approved</div>`}
+               </div>
+             `;
+             depContainer.appendChild(el);
+           });
+      }
+    }
+
+    // Update withdraw history container if visible
+    const wdContainer = $("withdrawHistory");
+    if (wdContainer) {
+      wdContainer.innerHTML = "";
+      if (snap.exists()) {
+        const txs = [];
+        snap.forEach(child => { txs.push({ ...child.val(), key: child.key }); });
+        txs.filter(t => t.type === "withdraw")
+           .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+           .slice(0, 8)
+           .forEach(t => {
+             const el = document.createElement("div");
+             el.className = `hist-item hist-bet ${t.status === "pending" ? "hist-pending" : t.status === "cancelled" ? "hist-cancelled" : ""}`;
+             el.innerHTML = `
+               <div class="hist-label">ðŸ“¤ Withdraw â†’ ${t.phone||""}
+                 ${t.ts ? `<div class="hist-date">${fmtDate(t.ts)}</div>` : ""}
+               </div>
+               <div class="hist-right">
+                 <div class="hist-amount neg">-${t.amount} ETB</div>
+                 ${t.status === "pending"
+                   ? `<div class="hist-status">â³ Pending...</div>`
+                   : t.status === "cancelled"
+                   ? `<div class="hist-status" style="color:#ff4444">âŒ Cancelled</div>`
+                   : `<div class="hist-status" style="color:var(--green)">âœ… á‰°áˆ‹áˆááˆ</div>`}
+               </div>
+             `;
+             wdContainer.appendChild(el);
+           });
+      }
+    }
   });
+}
+
+function loadDepositHistory() {
+  _startTransactionListener();
+}
+
+function loadWithdrawHistory() {
+  _startTransactionListener();
 }
 
 // ===== WITHDRAW =====
 async function submitWithdraw() {
   const phone = $("wdPhone").value.trim();
   const amt   = parseFloat($("wdAmount").value);
-  if (!phone || phone.length < 10) { toast("⚠ ትክክለኛ TeleBirr ቁጥር ያስገቡ!"); return; }
-  if (!amt || amt < 50)            { toast("⚠ ቢያንስ 50 ETB ያስገቡ!");           return; }
-  if (amt > userBalance)           { toast("⚠ በቂ ሂሳብ የለዎትም!");              return; }
+  if (!phone || phone.length < 10) { toast("âš  á‰µáŠ­áŠ­áˆˆáŠ› TeleBirr á‰áŒ¥áˆ­ á‹«áˆµáŒˆá‰¡!"); return; }
+  if (!amt || amt < 50)            { toast("âš  á‰¢á‹«áŠ•áˆµ 50 ETB á‹«áˆµáŒˆá‰¡!");           return; }
+  if (amt > userBalance)           { toast("âš  á‰ á‰‚ áˆ‚áˆ³á‰¥ á‹¨áˆˆá‹Žá‰µáˆ!");              return; }
 
   const fee    = +(amt * 0.05).toFixed(2);
   const payout = +(amt - 0).toFixed(2);
@@ -1738,32 +1784,10 @@ async function submitWithdraw() {
   await set(adminRef, { uid:UID, username: tgUser.username||myUsername, name:`${tgUser.first_name||""} ${tgUser.last_name||""}`.trim(), amount:amt, fee, payout, phone, status:"pending", ts: serverTimestamp() });
 
   $("wdPhone").value = ""; $("wdAmount").value = "";
-  toast(`✅ ጥያቄዎ ተልኳል! ${payout} ETB ወደ ${phone} ይደርሳል`);
+  toast(`âœ… áŒ¥á‹«á‰„á‹Ž á‰°áˆáŠ³áˆ! ${payout} ETB á‹ˆá‹° ${phone} á‹­á‹°áˆ­áˆ³áˆ`);
 }
 window.submitWithdraw = submitWithdraw;
 
-function loadWithdrawHistory() {
-  const container = $("withdrawHistory");
-  if (!container) return;
-  onValue(ref(db, `users/${UID}/transactions`), snap => {
-    container.innerHTML = "";
-    if (!snap.exists()) return;
-    const txs = [];
-    snap.forEach(child => { txs.push({ ...child.val(), key: child.key }); });
-    txs.filter(t => t.type === "withdraw").reverse().slice(0, 8).forEach(t => {
-      const el = document.createElement("div");
-      el.className = `hist-item hist-bet ${t.status === "pending" ? "hist-pending" : ""}`;
-      el.innerHTML = `
-        <div class="hist-label">📤 Withdraw → ${t.phone||""}</div>
-        <div class="hist-right">
-          <div class="hist-amount neg">-${t.amount} ETB</div>
-          ${t.status === "pending" ? `<div class="hist-status">⏳ Pending...</div>` : `<div class="hist-status" style="color:var(--green)">✅ ተላልፏል</div>`}
-        </div>
-      `;
-      container.appendChild(el);
-    });
-  });
-}
 window.loadWithdrawHistory = loadWithdrawHistory;
 
 // ===== FULL HISTORY =====
@@ -1773,7 +1797,7 @@ async function showHistory() {
   const container = $("fullHistory");
   container.innerHTML = "";
   if (!snap.exists()) {
-    container.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:40px;font-family:var(--font-am)">ምንም ግብይት የለም</div>`;
+    container.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:40px;font-family:var(--font-am)">áˆáŠ•áˆ áŒá‰¥á‹­á‰µ á‹¨áˆˆáˆ</div>`;
     return;
   }
   const txs = [];
@@ -1781,13 +1805,13 @@ async function showHistory() {
   txs.reverse().forEach(t => {
     const el = document.createElement("div");
     const cls = t.type === "win" ? "hist-win" : t.type === "deposit" ? "hist-dep" : "hist-bet";
-    const icon = t.type === "win" ? "🏆" : t.type === "deposit" ? "📥" : t.type === "withdraw" ? "📤" : "🎯";
+    const icon = t.type === "win" ? "ðŸ†" : t.type === "deposit" ? "ðŸ“¥" : t.type === "withdraw" ? "ðŸ“¤" : "ðŸŽ¯";
     const pos = t.type === "win" || t.type === "deposit";
     const dateStr = fmtDate(t.ts);
     // Label and amount logic
     let label, displayAmt, amtClass;
     if (t.type === "win") {
-      label = "ድል";
+      label = "á‹µáˆ";
       displayAmt = "+" + t.amount + " ETB";
       amtClass = "pos";
     } else if (t.type === "deposit") {
@@ -1800,7 +1824,7 @@ async function showHistory() {
       amtClass = "neg";
     } else {
       // stake / game entry fee
-      label = "ጨዋታ ክፍያ";
+      label = "áŒ¨á‹‹á‰³ áŠ­áá‹«";
       displayAmt = "-" + (t.stake || t.amount) + " ETB";
       amtClass = "neg";
     }
@@ -1812,7 +1836,7 @@ async function showHistory() {
       </div>
       <div class="hist-right">
         <div class="hist-amount ${amtClass}">${displayAmt}</div>
-        ${t.status === "pending" ? `<div class="hist-status">⏳ Pending</div>` : ""}
+        ${t.status === "pending" ? `<div class="hist-status">â³ Pending</div>` : ""}
       </div>
     `;
     container.appendChild(el);
@@ -1864,7 +1888,7 @@ init();
 
 
 // ===== ADMIN PANEL =====
-// Completely rewritten — no innerHTML, no ID selectors, pure DOM API
+// Completely rewritten â€” no innerHTML, no ID selectors, pure DOM API
 
 // Helper: treat missing/null/undefined status as "pending"
 function isPend(st) {
@@ -1883,7 +1907,7 @@ function loadAdminPanel() {
   _listenUsers();
 }
 
-// ── Tab switching ──────────────────────────────────────────────
+// â”€â”€ Tab switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function adminTab(tab) {
   const tabs   = ["deposit", "withdraw", "users"];
   const panels = {
@@ -1903,7 +1927,7 @@ function adminTab(tab) {
 }
 window.adminTab = adminTab;
 
-// ── Stats counters ─────────────────────────────────────────────
+// â”€â”€ Stats counters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _listenStats() {
   onValue(ref(db, "depositRequests"), snap => {
     let c = 0;
@@ -1925,7 +1949,7 @@ function _listenStats() {
   });
 }
 
-// ── Build a card using pure DOM (no innerHTML, no ID selectors) ─
+// â”€â”€ Build a card using pure DOM (no innerHTML, no ID selectors) â”€
 function _buildCard(cardClass, rows) {
   // rows = array of {type, content}
   // type: "header" | "meta" | "actions"
@@ -1953,13 +1977,13 @@ function _statusBadge(status) {
   const badge = _el("span", "ac-status");
   if (isPend(status)) {
     badge.className += " st-pending";
-    badge.textContent = "⏳ Pending";
+    badge.textContent = "â³ Pending";
   } else if (status === "approved") {
     badge.className += " st-approved";
-    badge.textContent = "✅ Approved";
+    badge.textContent = "âœ… Approved";
   } else {
     badge.className += " st-cancelled";
-    badge.textContent = "❌ Cancelled";
+    badge.textContent = "âŒ Cancelled";
   }
   return badge;
 }
@@ -1970,7 +1994,7 @@ function _btn(label, cls, onClick) {
   return b;
 }
 
-// ── Deposits ───────────────────────────────────────────────────
+// â”€â”€ Deposits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _makeDepCard(item) {
   const pend  = isPend(item.status);
   const cls   = pend ? "acard-pending" : item.status === "approved" ? "acard-approved" : "acard-cancelled";
@@ -1981,8 +2005,11 @@ function _makeDepCard(item) {
   const row1 = document.createElement("div");
   row1.className = "ac-row";
   const userDiv  = _el("div", "ac-user");
+  userDiv.style.cursor = "pointer";
+  userDiv.title = "á•áˆ®á‹á‹­áˆ áˆˆáˆ›á‹¨á‰µ áŒ á‰… á‹«á‹µáˆ­áŒ‰";
   userDiv.appendChild(_el("div", "ac-name", "@" + (item.username || "unknown")));
   userDiv.appendChild(_el("div", "ac-uid",  "ID: " + item.uid));
+  userDiv.addEventListener("click", () => openUserProfile(item.uid));
   row1.appendChild(userDiv);
   row1.appendChild(_el("div", "ac-amount pos", "+" + item.amount + " ETB"));
   card.appendChild(row1);
@@ -1990,8 +2017,8 @@ function _makeDepCard(item) {
   // Row 2: SMS + status badge
   const row2 = document.createElement("div");
   row2.className = "ac-row ac-meta";
-  const smsSpan = _el("span", null, "📱 SMS: ");
-  const smsBold = _el("b", null, item.sms || "—");
+  const smsSpan = _el("span", null, "ðŸ“± SMS: ");
+  const smsBold = _el("b", null, item.sms || "â€”");
   smsSpan.appendChild(smsBold);
   row2.appendChild(smsSpan);
   row2.appendChild(_statusBadge(item.status));
@@ -2001,8 +2028,8 @@ function _makeDepCard(item) {
   if (pend) {
     const row3 = document.createElement("div");
     row3.className = "ac-actions";
-    row3.appendChild(_btn("✅ Approve", "ac-approve", () => _approveDeposit(item.key, item.uid, item.amount)));
-    row3.appendChild(_btn("❌ Cancel",  "ac-cancel",  () => _cancelDeposit(item.key)));
+    row3.appendChild(_btn("âœ… Approve", "ac-approve", () => _approveDeposit(item.key, item.uid, item.amount)));
+    row3.appendChild(_btn("âŒ Cancel",  "ac-cancel",  () => _cancelDeposit(item.key)));
     card.appendChild(row3);
   }
 
@@ -2018,7 +2045,7 @@ function _listenDeposits() {
     while (list.firstChild) list.removeChild(list.firstChild);
 
     if (!snap.exists()) {
-      list.appendChild(_el("div", "admin-empty", "ምንም deposit request የለም"));
+      list.appendChild(_el("div", "admin-empty", "áˆáŠ•áˆ deposit request á‹¨áˆˆáˆ"));
       return;
     }
 
@@ -2031,7 +2058,7 @@ function _listenDeposits() {
         username: v.username || "",
         amount:   v.amount   || 0,
         sms:      v.sms      || "",
-        status:   v.status,      // may be undefined — isPend() handles it
+        status:   v.status,      // may be undefined â€” isPend() handles it
         ts:       v.ts       || 0
       });
     });
@@ -2049,7 +2076,7 @@ function _listenDeposits() {
 }
 
 async function _approveDeposit(key, uid, amount) {
-  if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
+  if (!confirm(amount + " ETB approve á‰³á‹°áˆ­áŒ‹áˆˆáˆ…?")) return;
   try {
     await update(ref(db, "depositRequests/" + key), { status: "approved" });
 
@@ -2070,24 +2097,45 @@ async function _approveDeposit(key, uid, amount) {
     const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
     await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
 
-    toast("✅ " + amount + " ETB approved! ሂሳቡ ወደ ተጠቃሚ ተጨምሯል");
+    toast("âœ… " + amount + " ETB approved! áˆ‚áˆ³á‰¡ á‹ˆá‹° á‰°áŒ á‰ƒáˆš á‰°áŒ¨áˆáˆ¯áˆ");
   } catch (e) {
     console.error(e);
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 
 async function _cancelDeposit(key) {
-  if (!confirm("ይህን deposit ሰርዝ?")) return;
+  if (!confirm("á‹­áˆ…áŠ• deposit áˆ°áˆ­á‹?")) return;
   try {
+    const reqSnap = await get(ref(db, "depositRequests/" + key));
+    if (!reqSnap.exists()) { toast("âš  Request not found"); return; }
+    const reqData = reqSnap.val();
+    const uid = reqData.uid;
+    const amount = reqData.amount;
+
     await update(ref(db, "depositRequests/" + key), { status: "cancelled" });
-    toast("❌ Deposit cancelled.");
+
+    // Also update the user's transaction status to "cancelled"
+    if (uid) {
+      const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
+      if (txSnap.exists()) {
+        const upd = {};
+        txSnap.forEach(s => {
+          const t = s.val();
+          if (t.type === "deposit" && isPend(t.status) && t.amount === amount)
+            upd["users/" + uid + "/transactions/" + s.key + "/status"] = "cancelled";
+        });
+        if (Object.keys(upd).length) await update(ref(db), upd);
+      }
+    }
+
+    toast("âŒ Deposit cancelled.");
   } catch (e) {
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 
-// ── Withdrawals ────────────────────────────────────────────────
+// â”€â”€ Withdrawals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _makeWdCard(item) {
   const pend = isPend(item.status);
   const cls  = pend ? "acard-pending" : item.status === "approved" ? "acard-approved" : "acard-cancelled";
@@ -2098,8 +2146,11 @@ function _makeWdCard(item) {
   const row1 = document.createElement("div");
   row1.className = "ac-row";
   const userDiv = _el("div", "ac-user");
+  userDiv.style.cursor = "pointer";
+  userDiv.title = "á•áˆ®á‹á‹­áˆ áˆˆáˆ›á‹¨á‰µ áŒ á‰… á‹«á‹µáˆ­áŒ‰";
   userDiv.appendChild(_el("div", "ac-name", "@" + (item.username || "unknown")));
   userDiv.appendChild(_el("div", "ac-uid",  "ID: " + item.uid));
+  userDiv.addEventListener("click", () => openUserProfile(item.uid));
   row1.appendChild(userDiv);
   row1.appendChild(_el("div", "ac-amount neg", "-" + item.amount + " ETB"));
   card.appendChild(row1);
@@ -2107,8 +2158,8 @@ function _makeWdCard(item) {
   // Row 2
   const row2 = document.createElement("div");
   row2.className = "ac-row ac-meta";
-  row2.appendChild(_el("span", null, "📱 " + (item.phone || "—")));
-  row2.appendChild(_el("span", null, "💸 " + (item.payout || item.amount) + " ETB"));
+  row2.appendChild(_el("span", null, "ðŸ“± " + (item.phone || "â€”")));
+  row2.appendChild(_el("span", null, "ðŸ’¸ " + (item.payout || item.amount) + " ETB"));
   row2.appendChild(_statusBadge(item.status));
   card.appendChild(row2);
 
@@ -2116,8 +2167,8 @@ function _makeWdCard(item) {
   if (pend) {
     const row3 = document.createElement("div");
     row3.className = "ac-actions";
-    row3.appendChild(_btn("✅ Mark Sent", "ac-approve", () => _approveWithdraw(item.key, item.uid, item.amount)));
-    row3.appendChild(_btn("❌ Refund",    "ac-cancel",  () => _cancelWithdraw(item.key, item.uid, item.amount)));
+    row3.appendChild(_btn("âœ… Mark Sent", "ac-approve", () => _approveWithdraw(item.key, item.uid, item.amount)));
+    row3.appendChild(_btn("âŒ Refund",    "ac-cancel",  () => _cancelWithdraw(item.key, item.uid, item.amount)));
     card.appendChild(row3);
   }
 
@@ -2132,7 +2183,7 @@ function _listenWithdraws() {
     while (list.firstChild) list.removeChild(list.firstChild);
 
     if (!snap.exists()) {
-      list.appendChild(_el("div", "admin-empty", "ምንም withdrawal request የለም"));
+      list.appendChild(_el("div", "admin-empty", "áˆáŠ•áˆ withdrawal request á‹¨áˆˆáˆ"));
       return;
     }
 
@@ -2163,7 +2214,7 @@ function _listenWithdraws() {
 }
 
 async function _approveWithdraw(key, uid, amount) {
-  if (!confirm(amount + " ETB ተልኳል ብለህ ታረጋግጣለህ?")) return;
+  if (!confirm(amount + " ETB á‰°áˆáŠ³áˆ á‰¥áˆˆáˆ… á‰³áˆ¨áŒ‹áŒáŒ£áˆˆáˆ…?")) return;
   try {
     await update(ref(db, "withdrawRequests/" + key), { status: "approved" });
     const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
@@ -2176,14 +2227,14 @@ async function _approveWithdraw(key, uid, amount) {
       });
       if (Object.keys(upd).length) await update(ref(db), upd);
     }
-    toast("✅ Withdrawal marked as sent!");
+    toast("âœ… Withdrawal marked as sent!");
   } catch (e) {
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 
 async function _cancelWithdraw(key, uid, amount) {
-  if (!confirm("Cancel & " + amount + " ETB refund ታደርጋለህ?")) return;
+  if (!confirm("Cancel & " + amount + " ETB refund á‰³á‹°áˆ­áŒ‹áˆˆáˆ…?")) return;
   try {
     await update(ref(db, "withdrawRequests/" + key), { status: "cancelled" });
     const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
@@ -2200,13 +2251,13 @@ async function _cancelWithdraw(key, uid, amount) {
     const balSnap = await get(ref(db, "users/" + uid + "/balance"));
     const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
     await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
-    toast("↩ Refunded " + amount + " ETB");
+    toast("â†© Refunded " + amount + " ETB");
   } catch (e) {
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 
-// ── Users ──────────────────────────────────────────────────────
+// â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function _listenUsers() {
   onValue(ref(db, "users"), snap => {
     const list = document.getElementById("adminUserList");
@@ -2214,7 +2265,7 @@ function _listenUsers() {
     while (list.firstChild) list.removeChild(list.firstChild);
 
     if (!snap.exists()) {
-      list.appendChild(_el("div", "admin-empty", "ምንም user የለም"));
+      list.appendChild(_el("div", "admin-empty", "áˆáŠ•áˆ user á‹¨áˆˆáˆ"));
       return;
     }
 
@@ -2240,7 +2291,7 @@ function _listenUsers() {
       row1.className = "ac-row";
       const userDiv = _el("div", "ac-user");
       userDiv.appendChild(_el("div", "ac-name", u.name || u.username || "Unknown"));
-      userDiv.appendChild(_el("div", "ac-uid", "@" + (u.username || "—") + " · ID: " + u.uid));
+      userDiv.appendChild(_el("div", "ac-uid", "@" + (u.username || "â€”") + " Â· ID: " + u.uid));
       row1.appendChild(userDiv);
       row1.appendChild(_el("div", "ac-amount pos", u.balance.toFixed(2) + " ETB"));
       card.appendChild(row1);
@@ -2249,11 +2300,11 @@ function _listenUsers() {
       const row2 = document.createElement("div");
       row2.className = "ac-actions";
 
-      const btnBalance = _btn("💰 Balance", "ac-approve", (e) => {
+      const btnBalance = _btn("ðŸ’° Balance", "ac-approve", (e) => {
         e.stopPropagation();
         _adjustBalance(u.uid, u.name || u.username || u.uid, u.balance);
       });
-      const btnMsg = _btn("✉️ ሜሴጅ", "ac-cancel", (e) => {
+      const btnMsg = _btn("âœ‰ï¸ áˆœáˆ´áŒ…", "ac-cancel", (e) => {
         e.stopPropagation();
         _currentMsgUid      = u.uid;
         _currentMsgUsername = u.name || u.username || u.uid;
@@ -2265,7 +2316,7 @@ function _listenUsers() {
       row2.appendChild(btnMsg);
       card.appendChild(row2);
 
-      // Click card → open profile
+      // Click card â†’ open profile
       card.addEventListener("click", () => openUserProfile(u.uid));
       list.appendChild(card);
     });
@@ -2273,19 +2324,19 @@ function _listenUsers() {
 }
 
 async function _adjustBalance(uid, name, cur) {
-  const val = prompt(name + "\nአዲስ balance (አሁን: " + cur.toFixed(2) + " ETB):");
+  const val = prompt(name + "\náŠ á‹²áˆµ balance (áŠ áˆáŠ•: " + cur.toFixed(2) + " ETB):");
   if (val === null) return;
   const nb = parseFloat(val);
-  if (isNaN(nb) || nb < 0) { toast("⚠ ትክክለኛ ቁጥር ያስገቡ"); return; }
+  if (isNaN(nb) || nb < 0) { toast("âš  á‰µáŠ­áŠ­áˆˆáŠ› á‰áŒ¥áˆ­ á‹«áˆµáŒˆá‰¡"); return; }
   try {
     await update(ref(db, "users/" + uid), { balance: nb });
-    toast("✅ Balance → " + nb + " ETB");
+    toast("âœ… Balance â†’ " + nb + " ETB");
   } catch (e) {
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 
-// ── Expose for modal buttons ──────────────────────────────────
+// â”€â”€ Expose for modal buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 window.upmAdjustBalance = async function() {
   if (!_currentProfileUid) return;
   const snap = await get(ref(db, "users/" + _currentProfileUid + "/balance"));
@@ -2311,21 +2362,21 @@ async function openUserProfile(uid) {
 
   // Reset
   document.getElementById("upmName").textContent     = "Loading...";
-  document.getElementById("upmUsername").textContent = "—";
+  document.getElementById("upmUsername").textContent = "â€”";
   document.getElementById("upmId").textContent       = "ID: " + uid;
-  document.getElementById("upmBalance").textContent  = "…";
-  document.getElementById("upmJoined").textContent   = "…";
-  document.getElementById("upmDepCount").textContent = "…";
-  document.getElementById("upmDepTotal").textContent = "…";
-  document.getElementById("upmWdCount").textContent  = "…";
-  document.getElementById("upmWdTotal").textContent  = "…";
-  document.getElementById("upmGames").textContent    = "…";
-  document.getElementById("upmWins").textContent     = "…";
+  document.getElementById("upmBalance").textContent  = "â€¦";
+  document.getElementById("upmJoined").textContent   = "â€¦";
+  document.getElementById("upmDepCount").textContent = "â€¦";
+  document.getElementById("upmDepTotal").textContent = "â€¦";
+  document.getElementById("upmWdCount").textContent  = "â€¦";
+  document.getElementById("upmWdTotal").textContent  = "â€¦";
+  document.getElementById("upmGames").textContent    = "â€¦";
+  document.getElementById("upmWins").textContent     = "â€¦";
   document.getElementById("upmTxList").innerHTML     = "";
 
   try {
     const userSnap = await get(ref(db, "users/" + uid));
-    if (!userSnap.exists()) { toast("⚠ User not found"); return; }
+    if (!userSnap.exists()) { toast("âš  User not found"); return; }
     const u = userSnap.val();
 
     const displayName = u.name || u.username || "Unknown";
@@ -2333,7 +2384,7 @@ async function openUserProfile(uid) {
 
     document.getElementById("upmAvatar").textContent    = (displayName[0] || "?").toUpperCase();
     document.getElementById("upmName").textContent      = displayName;
-    document.getElementById("upmUsername").textContent  = "@" + (u.username || "—");
+    document.getElementById("upmUsername").textContent  = "@" + (u.username || "â€”");
     document.getElementById("upmId").textContent        = "Telegram ID: " + uid;
     document.getElementById("upmBalance").textContent   = (u.balance || 0).toFixed(2);
 
@@ -2345,7 +2396,7 @@ async function openUserProfile(uid) {
         d.getFullYear() + "/" + p(d.getMonth()+1) + "/" + p(d.getDate()) +
         " " + p(d.getHours()) + ":" + p(d.getMinutes());
     } else {
-      document.getElementById("upmJoined").textContent = "—";
+      document.getElementById("upmJoined").textContent = "â€”";
     }
 
     // Transactions
@@ -2376,7 +2427,7 @@ async function openUserProfile(uid) {
     txContainer.innerHTML = "";
     const recent = [...txList].reverse().slice(0, 15);
     if (recent.length === 0) {
-      const empty = _el("div", null, "ምንም ግብይት የለም");
+      const empty = _el("div", null, "áˆáŠ•áˆ áŒá‰¥á‹­á‰µ á‹¨áˆˆáˆ");
       empty.style.cssText = "text-align:center;color:var(--text-dim);font-family:var(--font-am);padding:20px 0;font-size:0.78rem;";
       txContainer.appendChild(empty);
     }
@@ -2385,7 +2436,7 @@ async function openUserProfile(uid) {
       const typeMap = { deposit:"upm-dep", withdraw:"upm-wd", win:"upm-win", stake:"upm-stake" };
       item.className = "upm-tx-item " + (typeMap[t.type] || "");
 
-      const labelMap = { deposit:"📥 Deposit", withdraw:"📤 Withdraw", win:"🏆 ድል", stake:"🎯 ክፍያ" };
+      const labelMap = { deposit:"ðŸ“¥ Deposit", withdraw:"ðŸ“¤ Withdraw", win:"ðŸ† á‹µáˆ", stake:"ðŸŽ¯ áŠ­áá‹«" };
       const amtMap   = {
         deposit: "+" + (t.amount||0) + " ETB",
         withdraw: "-" + (t.amount||0) + " ETB",
@@ -2411,13 +2462,13 @@ async function openUserProfile(uid) {
       const amt = _el("div", "upm-tx-amt", amtMap[t.type] || "");
       amt.style.color = amtColor[t.type] || "#fff";
       right.appendChild(amt);
-      if (t.status === "pending") right.appendChild(_el("div", "upm-tx-status", "⏳ Pending"));
+      if (t.status === "pending") right.appendChild(_el("div", "upm-tx-status", "â³ Pending"));
       item.appendChild(right);
       txContainer.appendChild(item);
     });
   } catch(e) {
     console.error("[openUserProfile]", e);
-    toast("❌ Error loading profile");
+    toast("âŒ Error loading profile");
   }
 }
 window.openUserProfile = openUserProfile;
@@ -2431,7 +2482,7 @@ window.closeUserProfile = closeUserProfile;
 // ===== SEND MESSAGE =====
 function openSendMsg() {
   if (!_currentMsgUid) return;
-  document.getElementById("smmTo").textContent = "ወደ: " + (_currentMsgUsername || _currentMsgUid);
+  document.getElementById("smmTo").textContent = "á‹ˆá‹°: " + (_currentMsgUsername || _currentMsgUid);
   document.getElementById("smmText").value = "";
   document.getElementById("sendMsgOverlay").classList.add("active");
   document.getElementById("sendMsgModal").classList.add("active");
@@ -2447,7 +2498,7 @@ window.closeSendMsg = closeSendMsg;
 
 async function sendAdminMsg() {
   const text = document.getElementById("smmText").value.trim();
-  if (!text) { toast("⚠ ሜሴጁን ይጻፉ"); return; }
+  if (!text) { toast("âš  áˆœáˆ´áŒáŠ• á‹­áŒ»á‰"); return; }
   if (!_currentMsgUid) return;
 
   try {
@@ -2458,10 +2509,10 @@ async function sendAdminMsg() {
       read:    false,
       ts:      serverTimestamp()
     });
-    toast("✅ ሜሴጅ ተላልፏል!");
+    toast("âœ… áˆœáˆ´áŒ… á‰°áˆ‹áˆááˆ!");
     closeSendMsg();
   } catch(e) {
-    toast("❌ Error: " + e.message);
+    toast("âŒ Error: " + e.message);
   }
 }
 window.sendAdminMsg = sendAdminMsg;
@@ -2488,7 +2539,7 @@ function startNotifListener() {
 
     list.innerHTML = "";
     if (!snap.exists()) {
-      list.innerHTML = "<div class='notif-empty'>ምንም ማሳወቂያ የለም</div>";
+      list.innerHTML = "<div class='notif-empty'>áˆáŠ•áˆ áˆ›áˆ³á‹ˆá‰‚á‹« á‹¨áˆˆáˆ</div>";
       badge.style.display = "none";
       return;
     }
