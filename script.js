@@ -10,15 +10,14 @@ import {
 
 // ===== FIREBASE INIT =====
 const firebaseConfig = {
-  apiKey: "AIzaSyDV0Zl34dhrEzBUk1Eg6QomhxD_t2FO8vM", // አዲሱ API Key
-  authDomain: "alpha-bingo.firebaseapp.com",
-  projectId: "alpha-bingo", // ከ Database URL ጋር አንድ መሆን አለበት
-  storageBucket: "alpha-bingo.firebasestorage.app",
-  messagingSenderId: "741237539877",
-  appId: "1:741237539877:web:3cec874839a37d53cbabcc",
+  apiKey: "AIzaSyAZxHUnuaRNc6GfJQHNBnggJ_jfZFt_0mA",
+  authDomain: "baron-24c9e.firebaseapp.com",
+  projectId: "baron-24c9e",
+  storageBucket: "baron-24c9e.firebasestorage.app",
+  messagingSenderId: "559650974936",
+  appId: "1:559650974936:web:dd133acca1be5fec8cfbad",
   databaseURL: "https://alpha-bingo-default-rtdb.firebaseio.com"
 };
-
 const fbApp  = initializeApp(firebaseConfig);
 const db     = getDatabase(fbApp);
 
