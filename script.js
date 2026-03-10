@@ -2049,34 +2049,34 @@ function _listenDeposits() {
   });
 }
 
-async function _approveDeposit(key, uid, amount) {
-  if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
+async function _approveDeposit(reqKey, uid, amount) {
+  if (!confirm("ይህንን ዴፖዚት ማጽደቅ ይፈልጋሉ?")) return;
   try {
-    await update(ref(db, "depositRequests/" + key), { status: "approved" });
+    // 1. የአድሚን ጥያቄን ማጽደቅ
+    await update(ref(db, `depositRequests/${reqKey}`), { status: "approved" });
 
-    // Update user transaction
-    const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
-    if (txSnap.exists()) {
-      const upd = {};
-      txSnap.forEach(s => {
-        const t = s.val();
-        if (t.type === "deposit" && isPend(t.status) && t.amount === amount)
-          upd["users/" + uid + "/transactions/" + s.key + "/status"] = "approved";
-      });
-      if (Object.keys(upd).length) await update(ref(db), upd);
-    }
+    // 2. የተጠቃሚውን ባላንስ መጨመር (ወሳኙ ስህተት እዚህ ነበር)
+    const balanceRef = ref(db, `users/${uid}/balance`);
+    const snap = await get(balanceRef);
+    const currentBal = snap.exists() ? (Number(snap.val()) || 0) : 0;
+    await set(balanceRef, currentBal + Number(amount));
 
-    // Credit balance
-    const balSnap = await get(ref(db, "users/" + uid + "/balance"));
-    const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
-    await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
+    // 3. ለተጠቃሚው ማሳወቂያ መላክ
+    const notifRef = push(ref(db, `users/${uid}/notifications`));
+    await set(notifRef, {
+      from: "Alpha Bingo",
+      message: `የ ${amount} ETB ዴፖዚት ጥያቄዎ ተቀባይነት አግኝቷል! 💰`,
+      ts: serverTimestamp(),
+      read: false
+    });
 
-    toast("✅ " + amount + " ETB approved! ሂሳቡ ወደ ተጠቃሚ ተጨምሯል");
+    toast("✅ ዴፖዚቱ ጸድቋል፤ ባላንስ ተጨምሯል!");
+    _loadAdminRequests(); // ዝርዝሩን ለማደስ
   } catch (e) {
-    console.error(e);
-    toast("❌ Error: " + e.message);
+    toast("❌ ስህተት: " + e.message);
   }
 }
+
 
 async function _cancelDeposit(key) {
   if (!confirm("ይህን deposit ሰርዝ?")) return;
@@ -2465,7 +2465,31 @@ async function sendAdminMsg() {
     toast("❌ Error: " + e.message);
   }
 }
-window.sendAdminMsg = sendAdminMsg;
+window.sendAdminMsg = async function() {
+  const text = $("smmText").value.trim();
+  // _currentMsgUid አድሚኑ የከፈተው የተጠቃሚ ID መሆኑን ያረጋግጣል
+  if (!text || !_currentMsgUid) {
+    toast("⚠ እባክዎ መልዕክት ይጻፉ!");
+    return;
+  }
+  
+  try {
+    const notifRef = push(ref(db, `users/${_currentMsgUid}/notifications`));
+    await set(notifRef, {
+      from: "Alpha Bingo Support",
+      message: text,
+      ts: serverTimestamp(),
+      read: false
+    });
+    
+    closeSendMsg();
+    $("smmText").value = "";
+    toast("✅ መልዕክቱ ለተጠቃሚው ተልኳል!");
+  } catch (e) {
+    toast("❌ ስህተት: " + e.message);
+  }
+};
+
 
 // ===== NOTIFICATION INBOX (for regular users) =====
 function openNotifInbox() {
