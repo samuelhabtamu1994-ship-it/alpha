@@ -2091,16 +2091,6 @@ async function _approveDeposit(reqKey, uid, amount) {
 }
 
 
-async function _cancelDeposit(key) {
-  if (!confirm("ይህን deposit ሰርዝ?")) return;
-  try {
-    await update(ref(db, "depositRequests/" + key), { status: "cancelled" });
-    toast("❌ Deposit cancelled.");
-  } catch (e) {
-    toast("❌ Error: " + e.message);
-  }
-}
-
 // ── Withdrawals ────────────────────────────────────────────────
 function _makeWdCard(item) {
   const pend = isPend(item.status);
@@ -2505,24 +2495,6 @@ window.sendAdminMsg = async function() {
   } catch (e) {
     console.error("Message Error:", e);
     toast("❌ መልዕክት መላክ አልተቻለም: " + e.message);
-  }
-};
-
-  
-  try {
-    const notifRef = push(ref(db, `users/${_currentMsgUid}/notifications`));
-    await set(notifRef, {
-      from: "Alpha Bingo Support",
-      message: text,
-      ts: serverTimestamp(),
-      read: false
-    });
-    
-    closeSendMsg();
-    $("smmText").value = "";
-    toast("✅ መልዕክቱ ለተጠቃሚው ተልኳል!");
-  } catch (e) {
-    toast("❌ ስህተት: " + e.message);
   }
 };
 
