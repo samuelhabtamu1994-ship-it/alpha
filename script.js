@@ -2557,6 +2557,9 @@ function startNotifListener() {
           item.appendChild(_el("div", "notif-item-time",
             d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())));
         }
+        // Animate only newly added items
+        item.classList.add("notif-new");
+        setTimeout(() => item.classList.remove("notif-new"), 300);
       }
       // Always sync read/unread class (no re-render = no blink)
       item.className = "notif-item" + (!n.read ? " notif-unread" : "");
