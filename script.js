@@ -2473,24 +2473,30 @@ function closeSendMsg() {
 window.closeSendMsg = closeSendMsg;
 
 async function sendAdminMsg() {
-  const text = document.getElementById("smmText").value.trim();
-  if (!text) { toast("⚠ ሜሴጁን ይጻፉ"); return; }
-  if (!_currentMsgUid) return;
+  const text = document.getElementById("smmInput").value.trim();
+  if (!text || !_currentMsgUid) return;
 
   try {
-    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
-    await set(msgRef, {
-      from:    "Alpha Bingo Admin",
+    // እዚህ ጋር 'notifications' ስር push() ማድረጉን ያረጋግጡ
+    const notifListRef = ref(db, "users/" + _currentMsgUid + "/notifications");
+    const newMsgRef = push(notifListRef); 
+
+    await set(newMsgRef, {
+      from: "Alpha Bingo Admin",
       message: text,
-      read:    false,
-      ts:      serverTimestamp()
+      read: false,
+      ts: serverTimestamp() // ወይም Date.now()
     });
-    toast("✅ ሜሴጅ ተላልፏል!");
+
+    toast("✅ መልዕክቱ ተልኳል!");
     closeSendMsg();
+    document.getElementById("smmInput").value = ""; // ጽሁፉን ለማጥፋት
   } catch(e) {
-    toast("❌ Error: " + e.message);
+    console.error(e);
+    toast("❌ ስህተት: " + e.message);
   }
 }
+
 window.sendAdminMsg = sendAdminMsg;
 
 // ===== NOTIFICATION INBOX (for regular users) =====
