@@ -2501,10 +2501,11 @@ async function sendAdminMsg() {
 window.sendAdminMsg = sendAdminMsg;
 
 // ===== NOTIFICATION INBOX (for regular users) =====
-function openNotifInbox() {
-  document.getElementById("notifOverlay").classList.add("active");
-  document.getElementById("notifModal").classList.add("active");
-  markNotifsRead();
+function closeNotifInbox() {
+  document.getElementById("notifOverlay").classList.remove("active");
+  document.getElementById("notifModal").classList.remove("active");
+  // small delay to avoid racing with onValue initial render
+  setTimeout(markNotifsRead, 400);
 }
 window.openNotifInbox = openNotifInbox;
 
