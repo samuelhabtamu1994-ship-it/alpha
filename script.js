@@ -173,15 +173,7 @@ async function initUser() {
   const uRef = ref(db, `users/${UID}`);
   const snap = await get(uRef);
 
-  // Menu avatar — use Telegram profile photo if available, fallback to initial
-  const menuAvatarEl = $("menuAvatar");
-  if (tgUser.photo_url) {
-    menuAvatarEl.innerHTML = `<img src="${tgUser.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${(tgUser.first_name?.[0] || '?').toUpperCase()}'" />`;
-    menuAvatarEl.style.padding = "0";
-    menuAvatarEl.style.overflow = "hidden";
-  } else {
-    menuAvatarEl.textContent = (tgUser.first_name?.[0] || "?").toUpperCase();
-  }
+  $("menuAvatar").textContent = (tgUser.first_name?.[0] || "?").toUpperCase();
   $("menuName").textContent   = `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim() || "Player";
   $("menuPhone").textContent  = "Telegram ID: " + UID;
 
@@ -191,17 +183,12 @@ async function initUser() {
       uid: UID,
       name: `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
       username: tgUser.username || "",
-      photo_url: tgUser.photo_url || "",
       balance: 0,
       createdAt: serverTimestamp()
     });
     userBalance = 0;
   } else {
     userBalance = snap.val().balance || 0;
-    // Update photo_url if changed
-    if (tgUser.photo_url && snap.val().photo_url !== tgUser.photo_url) {
-      update(uRef, { photo_url: tgUser.photo_url }).catch(console.error);
-    }
     // Phone from firebase if stored
     const ph = snap.val().phone;
     if (ph) $("menuPhone").textContent = ph;
@@ -2371,15 +2358,7 @@ async function openUserProfile(uid) {
     const displayName = u.name || u.username || "Unknown";
     _currentMsgUsername = displayName;
 
-    // Avatar — show Telegram profile photo if stored, else initial letter
-    const upmAvatarEl = document.getElementById("upmAvatar");
-    if (u.photo_url) {
-      upmAvatarEl.innerHTML = `<img src="${u.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${(displayName[0] || '?').toUpperCase()}'" />`;
-      upmAvatarEl.style.padding = "0";
-      upmAvatarEl.style.overflow = "hidden";
-    } else {
-      upmAvatarEl.textContent = (displayName[0] || "?").toUpperCase();
-    }
+    document.getElementById("upmAvatar").textContent    = (displayName[0] || "?").toUpperCase();
     document.getElementById("upmName").textContent      = displayName;
     document.getElementById("upmUsername").textContent  = "@" + (u.username || "—");
     document.getElementById("upmId").textContent        = "Telegram ID: " + uid;
@@ -2518,9 +2497,7 @@ window.sendAdminMsg = sendAdminMsg;
 function openNotifInbox() {
   document.getElementById("notifOverlay").classList.add("active");
   document.getElementById("notifModal").classList.add("active");
-  // Delay markNotifsRead so the onValue listener renders all messages first
-  // before Firebase re-fires from read:false→true updates (fixes missing messages bug)
-  setTimeout(markNotifsRead, 800);
+  markNotifsRead();
 }
 window.openNotifInbox = openNotifInbox;
 
@@ -2529,6 +2506,9 @@ function closeNotifInbox() {
   document.getElementById("notifModal").classList.remove("active");
 }
 window.closeNotifInbox = closeNotifInbox;
+
+// Track keys rendered last time so we can detect truly new arrivals
+let _lastNotifKeys = new Set();
 
 function startNotifListener() {
   onValue(ref(db, "users/" + UID + "/notifications"), snap => {
@@ -2539,14 +2519,24 @@ function startNotifListener() {
     if (!snap.exists()) {
       list.innerHTML = "<div class='notif-empty'>ምንም ማሳወቂያ የለም</div>";
       badge.style.display = "none";
+      _lastNotifKeys = new Set();
       return;
     }
 
+    // Collect all notifications from snapshot
     const notifs = [];
     snap.forEach(child => notifs.push({ key: child.key, ...child.val() }));
-    notifs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-    // Update badge
+    // Stable sort: use Firebase push key (lexicographic = insertion order) as tiebreaker
+    // This avoids re-ordering when serverTimestamp() first arrives as null then fills in
+    notifs.sort((a, b) => {
+      const ta = a.ts || 0;
+      const tb = b.ts || 0;
+      if (tb !== ta) return tb - ta;           // newest first by timestamp
+      return b.key > a.key ? 1 : -1;          // tiebreak by push key (stable)
+    });
+
+    // Badge: count unread
     const unread = notifs.filter(n => !n.read).length;
     if (unread > 0) {
       badge.textContent   = unread > 9 ? "9+" : unread;
@@ -2555,45 +2545,38 @@ function startNotifListener() {
       badge.style.display = "none";
     }
 
-    // Build keyed map of existing DOM items to avoid full re-render (prevents blink)
-    const existing = {};
-    list.querySelectorAll(".notif-item[data-key]").forEach(el => {
-      existing[el.dataset.key] = el;
-    });
+    // Detect which keys are genuinely new this render
+    const incomingKeys = new Set(notifs.map(n => n.key));
+    const newKeys = new Set([...incomingKeys].filter(k => !_lastNotifKeys.has(k)));
+    _lastNotifKeys = incomingKeys;
 
-    // Remove "empty" placeholder if present
-    list.querySelectorAll(".notif-empty").forEach(el => el.remove());
+    // Full re-render — simple and correct, avoids all DOM diffing bugs
+    list.innerHTML = "";
+    notifs.forEach(n => {
+      const item = document.createElement("div");
+      item.dataset.key = n.key;
+      item.className   = "notif-item" + (!n.read ? " notif-unread" : "");
 
-    // Insert or update each notification without destroying existing elements
-    notifs.forEach((n, idx) => {
-      let item = existing[n.key];
-      if (!item) {
-        item = document.createElement("div");
-        item.dataset.key = n.key;
-        const from = _el("div", "notif-item-from", n.from || "Admin");
-        const msg  = _el("div", "notif-item-msg",  n.message || "");
-        item.appendChild(from);
-        item.appendChild(msg);
-        if (n.ts) {
-          const d = new Date(n.ts);
-          const p = x => String(x).padStart(2,"0");
-          item.appendChild(_el("div", "notif-item-time",
-            d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())));
-        }
-        // Animate only newly added items
-        item.classList.add("notif-new");
-        setTimeout(() => item.classList.remove("notif-new"), 300);
+      item.appendChild(_el("div", "notif-item-from", n.from || "Admin"));
+      item.appendChild(_el("div", "notif-item-msg",  n.message || ""));
+
+      // Timestamp: use push-key embedded time as fallback when serverTimestamp not yet filled
+      const tsMs = n.ts || null;
+      if (tsMs) {
+        const d = new Date(tsMs);
+        const p = x => String(x).padStart(2, "0");
+        item.appendChild(_el("div", "notif-item-time",
+          d.getFullYear() + "/" + p(d.getMonth()+1) + "/" + p(d.getDate()) +
+          " " + p(d.getHours()) + ":" + p(d.getMinutes())));
       }
-      // Always sync read/unread class (no re-render = no blink)
-      item.className = "notif-item" + (!n.read ? " notif-unread" : "");
-      // Maintain sort order
-      if (list.children[idx] !== item) list.insertBefore(item, list.children[idx] || null);
-    });
 
-    // Remove stale items no longer in snapshot
-    const currentKeys = new Set(notifs.map(n => n.key));
-    Object.keys(existing).forEach(k => {
-      if (!currentKeys.has(k)) existing[k].remove();
+      // Slide-in animation only for truly new items
+      if (newKeys.has(n.key)) {
+        item.classList.add("notif-new");
+        setTimeout(() => item.classList.remove("notif-new"), 400);
+      }
+
+      list.appendChild(item);
     });
   });
 }
