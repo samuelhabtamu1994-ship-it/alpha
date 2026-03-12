@@ -1638,33 +1638,35 @@ async function submitDeposit() {
   const sms = $("depSms").value.trim();
 
   if (!amt || amt < 50) { toast("⚠ ቢያንስ 50 ETB ያስገቡ!"); return; }
-  if (!sms) { toast("⚠ Transaction ID ወይም SMS ያስገቡ!"); return; }
+  if (!sms) { toast("⚠ SMS ማረጋገጫ ያስፈልጋል!"); return; }
 
-  // Firebase ላይ save — Railway server depositRequests listener ወዲያውኑ ያነሳዋል
-  const txRef    = push(ref(db, `users/${UID}/transactions`));
-  const adminRef = push(ref(db, `depositRequests`));
-  const txKey    = txRef.key;
-  const reqKey   = adminRef.key;
-
+  // Save pending request to Firebase
+  const txRef = push(ref(db, `users/${UID}/transactions`));
   await set(txRef, {
-    type: "deposit", status: "pending",
-    amount: amt, sms, uid: UID,
+    type: "deposit",
+    status: "pending",
+    amount: amt,
+    sms,
+    uid: UID,
     username: tgUser.username || myUsername,
     ts: serverTimestamp()
   });
 
+  // Also save to admin requests
+  const adminRef = push(ref(db, `depositRequests`));
   await set(adminRef, {
     uid: UID,
     username: tgUser.username || myUsername,
     name: `${tgUser.first_name||""} ${tgUser.last_name||""}`.trim(),
-    amount: amt, sms, txKey,
+    amount: amt,
+    sms,
     status: "pending",
     ts: serverTimestamp()
   });
 
   $("depAmount").value = "";
-  $("depSms").value    = "";
-  toast("✅ ጥያቄዎ ተልኳል! በራስሰር እየተረጋገጠ ነው...");
+  $("depSms").value = "";
+  toast("✅ ጥያቄዎ ተልኳል! ከ admin ማረጋገጫ ይጠብቁ");
   loadDepositHistory();
 }
 window.submitDeposit = submitDeposit;
@@ -1679,7 +1681,7 @@ function fmtDate(ts) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 function loadDepositHistory() {
-  if (_depHistStarted) return;
+  if (_depHistStarted) return; // already listening
   _depHistStarted = true;
   onValue(ref(db, `users/${UID}/transactions`), snap => {
     const container = $("depositHistory");
@@ -1694,49 +1696,24 @@ function loadDepositHistory() {
        .forEach(t => {
          const el = document.createElement("div");
          const depDate = fmtDate(t.ts);
-         const isRejected = t.status === "rejected";
-         el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : ""} ${isRejected ? "hist-rejected" : ""}`;
-
-         let statusHtml = "";
-         if (t.status === "pending") {
-           statusHtml = `<div class="hist-status">⏳ በመጠባበቅ ላይ...</div>`;
-         } else if (t.status === "manual_review") {
-           statusHtml = `<div class="hist-status" style="color:#ffa500">🔍 Manual review</div>`;
-         } else if (isRejected) {
-           statusHtml = `
-             <div class="hist-status" style="color:#ff4444">❌ ተቀባይነት አላገኘም</div>
-             ${t.rejectReason ? `<div class="hist-date" style="color:#ff8888">${t.rejectReason}</div>` : ""}
-             <button class="resubmit-btn" onclick="openResubmit('${t.amount}')">🔄 እንደገና ይሞክሩ</button>
-           `;
-         } else if (t.status === "cancelled") {
-           statusHtml = `<div class="hist-status" style="color:#ff4444">❌ ተሰርዟል</div>`;
-         } else {
-           statusHtml = `<div class="hist-status" style="color:var(--green)">✅ ተረጋግጧል</div>`;
-         }
-
+         el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : ""}`;
          el.innerHTML = `
            <div class="hist-label">📥 Deposit
              ${depDate ? `<div class="hist-date">${depDate}</div>` : ""}
            </div>
            <div class="hist-right">
              <div class="hist-amount pos">+${t.amount} ETB</div>
-             ${statusHtml}
+             ${t.status === "pending"
+               ? `<div class="hist-status">⏳ Pending...</div>`
+               : t.status === "cancelled"
+               ? `<div class="hist-status" style="color:#ff4444">❌ Cancelled</div>`
+               : `<div class="hist-status" style="color:var(--green)">✅ Approved</div>`}
            </div>
          `;
          container.appendChild(el);
        });
   });
 }
-
-// openResubmit — rejected deposit ን ዳግም ለማስገባት deposit screen ይከፍታል
-function openResubmit(amount) {
-  showScreen("screen-deposit");
-  if (amount) $("depAmount").value = amount;
-  $("depSms").value = "";
-  $("depSms").focus();
-  toast("⚠ ትክክለኛ Transaction ID ወይም SMS ኮድ ያስገቡ");
-}
-window.openResubmit = openResubmit;
 
 // ===== WITHDRAW =====
 async function submitWithdraw() {
@@ -2018,14 +1995,38 @@ function _makeDepCard(item) {
   row1.appendChild(_el("div", "ac-amount pos", "+" + item.amount + " ETB"));
   card.appendChild(row1);
 
-  // Row 2: SMS + status badge
+  // Row 2: SMS + status badge + auto/manual label
   const row2 = document.createElement("div");
   row2.className = "ac-row ac-meta";
   const smsSpan = _el("span", null, "📱 SMS: ");
   const smsBold = _el("b", null, item.sms || "—");
   smsSpan.appendChild(smsBold);
   row2.appendChild(smsSpan);
-  row2.appendChild(_statusBadge(item.status));
+
+  // Status badge — auto vs manual
+  const statusWrap = document.createElement("div");
+  statusWrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+  statusWrap.appendChild(_statusBadge(item.status));
+  if (item.status === "approved") {
+    const byBadge = document.createElement("span");
+    byBadge.style.cssText = "font-size:0.6rem;padding:2px 7px;border-radius:8px;font-weight:700;";
+    if (item.approvedBy === "auto") {
+      byBadge.textContent = "🤖 AUTO";
+      byBadge.style.background = "rgba(0,230,118,0.15)";
+      byBadge.style.color = "#00e676";
+    } else {
+      byBadge.textContent = "👤 MANUAL";
+      byBadge.style.background = "rgba(100,181,246,0.15)";
+      byBadge.style.color = "#64b5f6";
+    }
+    statusWrap.appendChild(byBadge);
+  }
+  if (item.txId) {
+    const txEl = _el("span", null, "TX: " + item.txId);
+    txEl.style.cssText = "font-size:0.58rem;color:rgba(255,255,255,0.35);display:block;margin-top:2px;";
+    row2.appendChild(txEl);
+  }
+  row2.appendChild(statusWrap);
   card.appendChild(row2);
 
   // Row 3: Action buttons (only if pending)
@@ -2057,13 +2058,15 @@ function _listenDeposits() {
     snap.forEach(s => {
       const v = s.val();
       items.push({
-        key:      s.key,
-        uid:      v.uid      || "",
-        username: v.username || "",
-        amount:   v.amount   || 0,
-        sms:      v.sms      || "",
-        status:   v.status,      // may be undefined — isPend() handles it
-        ts:       v.ts       || 0
+        key:        s.key,
+        uid:        v.uid        || "",
+        username:   v.username   || "",
+        amount:     v.amount     || 0,
+        sms:        v.sms        || "",
+        status:     v.status,
+        approvedBy: v.approvedBy || "",
+        txId:       v.txId       || "",
+        ts:         v.ts         || 0
       });
     });
 
@@ -2082,7 +2085,12 @@ function _listenDeposits() {
 async function _approveDeposit(key, uid, amount) {
   if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
   try {
-    await update(ref(db, "depositRequests/" + key), { status: "approved" });
+    // approvedBy = admin UID — "manual" መሆኑን ያሳያል
+    await update(ref(db, "depositRequests/" + key), {
+      status:     "approved",
+      approvedBy: UID,          // admin UID — "auto" አይደለም ስለዚህ manual ነው
+      approvedAt: serverTimestamp()
+    });
 
     // Update user transaction
     const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
@@ -2090,8 +2098,10 @@ async function _approveDeposit(key, uid, amount) {
       const upd = {};
       txSnap.forEach(s => {
         const t = s.val();
-        if (t.type === "deposit" && isPend(t.status) && t.amount === amount)
-          upd["users/" + uid + "/transactions/" + s.key + "/status"] = "approved";
+        if (t.type === "deposit" && isPend(t.status) && t.amount === amount) {
+          upd["users/" + uid + "/transactions/" + s.key + "/status"]     = "approved";
+          upd["users/" + uid + "/transactions/" + s.key + "/approvedBy"] = UID;
+        }
       });
       if (Object.keys(upd).length) await update(ref(db), upd);
     }
@@ -2101,7 +2111,15 @@ async function _approveDeposit(key, uid, amount) {
     const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
     await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
 
-    toast("✅ " + amount + " ETB approved! ሂሳቡ ወደ ተጠቃሚ ተጨምሯል");
+    // Notify user
+    await set(push(ref(db, "users/" + uid + "/notifications")), {
+      from:    "Alpha Bingo",
+      message: "✅ " + amount + " ETB deposit ተረጋግጧል! ሂሳብዎ ተዘምኗል።",
+      read:    false,
+      ts:      serverTimestamp()
+    });
+
+    toast("✅ " + amount + " ETB approved!");
   } catch (e) {
     console.error(e);
     toast("❌ Error: " + e.message);
@@ -2461,7 +2479,41 @@ async function openUserProfile(uid) {
       const amt = _el("div", "upm-tx-amt", amtMap[t.type] || "");
       amt.style.color = amtColor[t.type] || "#fff";
       right.appendChild(amt);
-      if (t.status === "pending") right.appendChild(_el("div", "upm-tx-status", "⏳ Pending"));
+
+      // Status label — auto vs manual vs pending vs rejected
+      if (t.type === "deposit") {
+        let statusEl;
+        if (t.status === "pending") {
+          statusEl = _el("div", "upm-tx-status", "⏳ Pending");
+          statusEl.style.color = "#ffa500";
+        } else if (t.status === "manual_review") {
+          statusEl = _el("div", "upm-tx-status", "🔍 Manual review");
+          statusEl.style.color = "#ffa500";
+        } else if (t.status === "rejected") {
+          statusEl = _el("div", "upm-tx-status", "❌ Rejected");
+          statusEl.style.color = "#ff4444";
+        } else if (t.status === "approved") {
+          // approvedBy: "auto" = server, anything else = admin manually
+          if (t.approvedBy === "auto") {
+            statusEl = _el("div", "upm-tx-status", "🤖 Auto approved");
+            statusEl.style.color = "#00e676";
+          } else {
+            statusEl = _el("div", "upm-tx-status", "👤 Manual approved");
+            statusEl.style.color = "#64b5f6";
+          }
+        }
+        if (statusEl) right.appendChild(statusEl);
+
+        // txId ካለ ያሳይ
+        if (t.txId) {
+          const txEl = _el("div", "upm-tx-date", "TX: " + t.txId);
+          txEl.style.color = "rgba(255,255,255,0.4)";
+          right.appendChild(txEl);
+        }
+      } else {
+        if (t.status === "pending") right.appendChild(_el("div", "upm-tx-status", "⏳ Pending"));
+      }
+
       item.appendChild(right);
       txContainer.appendChild(item);
     });
