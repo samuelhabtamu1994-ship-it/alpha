@@ -1638,36 +1638,55 @@ async function submitDeposit() {
   const sms = $("depSms").value.trim();
 
   if (!amt || amt < 50) { toast("⚠ ቢያንስ 50 ETB ያስገቡ!"); return; }
-  if (!sms) { toast("⚠ SMS ማረጋገጫ ያስፈልጋል!"); return; }
+  if (!sms) { toast("⚠ Transaction ID ወይም SMS ያስገቡ!"); return; }
 
-  // Save pending request to Firebase
-  const txRef = push(ref(db, `users/${UID}/transactions`));
+  // 1. Save to Firebase first
+  const txRef    = push(ref(db, `users/${UID}/transactions`));
+  const adminRef = push(ref(db, `depositRequests`));
+
+  const txKey  = txRef.key;
+  const reqKey = adminRef.key;
+
   await set(txRef, {
-    type: "deposit",
-    status: "pending",
-    amount: amt,
-    sms,
-    uid: UID,
+    type: "deposit", status: "pending",
+    amount: amt, sms, uid: UID,
     username: tgUser.username || myUsername,
     ts: serverTimestamp()
   });
 
-  // Also save to admin requests
-  const adminRef = push(ref(db, `depositRequests`));
   await set(adminRef, {
     uid: UID,
     username: tgUser.username || myUsername,
     name: `${tgUser.first_name||""} ${tgUser.last_name||""}`.trim(),
-    amount: amt,
-    sms,
+    amount: amt, sms, txKey,
     status: "pending",
     ts: serverTimestamp()
   });
 
   $("depAmount").value = "";
-  $("depSms").value = "";
-  toast("✅ ጥያቄዎ ተልኳል! ከ admin ማረጋገጫ ይጠብቁ");
+  $("depSms").value    = "";
+  toast("✅ ጥያቄዎ ተልኳል! በራስሰር እየተረጋገጠ ነው...");
   loadDepositHistory();
+
+  // 2. Notify Railway server — SMS ቅድሚያ ከደረሰ ወዲያውኑ approve ያደርጋል
+  const RAILWAY_URL    = "https://YOUR-RAILWAY-URL.up.railway.app";
+  const WEBHOOK_SECRET = "YOUR-SECRET-KEY";
+  try {
+    await fetch(`${RAILWAY_URL}/deposit-request`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: WEBHOOK_SECRET,
+        uid:    UID,
+        reqKey,
+        amount: amt,
+        sms
+      })
+    });
+  } catch(e) {
+    // Network error — server timeout checker ይወስደዋል
+    console.warn("[deposit-request] server notify failed:", e.message);
+  }
 }
 window.submitDeposit = submitDeposit;
 
@@ -1681,7 +1700,7 @@ function fmtDate(ts) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 function loadDepositHistory() {
-  if (_depHistStarted) return; // already listening
+  if (_depHistStarted) return;
   _depHistStarted = true;
   onValue(ref(db, `users/${UID}/transactions`), snap => {
     const container = $("depositHistory");
@@ -1696,24 +1715,49 @@ function loadDepositHistory() {
        .forEach(t => {
          const el = document.createElement("div");
          const depDate = fmtDate(t.ts);
-         el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : ""}`;
+         const isRejected = t.status === "rejected";
+         el.className = `hist-item hist-dep ${t.status === "pending" ? "hist-pending" : ""} ${isRejected ? "hist-rejected" : ""}`;
+
+         let statusHtml = "";
+         if (t.status === "pending") {
+           statusHtml = `<div class="hist-status">⏳ በመጠባበቅ ላይ...</div>`;
+         } else if (t.status === "manual_review") {
+           statusHtml = `<div class="hist-status" style="color:#ffa500">🔍 Manual review</div>`;
+         } else if (isRejected) {
+           statusHtml = `
+             <div class="hist-status" style="color:#ff4444">❌ ተቀባይነት አላገኘም</div>
+             ${t.rejectReason ? `<div class="hist-date" style="color:#ff8888">${t.rejectReason}</div>` : ""}
+             <button class="resubmit-btn" onclick="openResubmit('${t.amount}')">🔄 እንደገና ይሞክሩ</button>
+           `;
+         } else if (t.status === "cancelled") {
+           statusHtml = `<div class="hist-status" style="color:#ff4444">❌ ተሰርዟል</div>`;
+         } else {
+           statusHtml = `<div class="hist-status" style="color:var(--green)">✅ ተረጋግጧል</div>`;
+         }
+
          el.innerHTML = `
            <div class="hist-label">📥 Deposit
              ${depDate ? `<div class="hist-date">${depDate}</div>` : ""}
            </div>
            <div class="hist-right">
              <div class="hist-amount pos">+${t.amount} ETB</div>
-             ${t.status === "pending"
-               ? `<div class="hist-status">⏳ Pending...</div>`
-               : t.status === "cancelled"
-               ? `<div class="hist-status" style="color:#ff4444">❌ Cancelled</div>`
-               : `<div class="hist-status" style="color:var(--green)">✅ Approved</div>`}
+             ${statusHtml}
            </div>
          `;
          container.appendChild(el);
        });
   });
 }
+
+// openResubmit — rejected deposit ን ዳግም ለማስገባት deposit screen ይከፍታል
+function openResubmit(amount) {
+  showScreen("screen-deposit");
+  if (amount) $("depAmount").value = amount;
+  $("depSms").value = "";
+  $("depSms").focus();
+  toast("⚠ ትክክለኛ Transaction ID ወይም SMS ኮድ ያስገቡ");
+}
+window.openResubmit = openResubmit;
 
 // ===== WITHDRAW =====
 async function submitWithdraw() {
@@ -2478,24 +2522,17 @@ async function sendAdminMsg() {
   if (!_currentMsgUid) return;
 
   try {
-    const notifPath = "users/" + _currentMsgUid + "/notifications";
-    console.log("[sendAdminMsg] to uid:", _currentMsgUid, "path:", notifPath);
-    const msgRef = push(ref(db, notifPath));
-    console.log("[sendAdminMsg] push key:", msgRef.key);
+    const msgRef = push(ref(db, "users/" + _currentMsgUid + "/notifications"));
     await set(msgRef, {
       from:    "Alpha Bingo Admin",
       message: text,
       read:    false,
       ts:      serverTimestamp()
     });
-    const check = await get(ref(db, notifPath));
-    const count = check.exists() ? Object.keys(check.val()).length : 0;
-    console.log("[sendAdminMsg] DB now has", count, "notifications for this user");
-    toast("\u2705 \u1230ሴጅ ተላልፏል! (DB count: " + count + ")");
+    toast("✅ ሜሴጅ ተላልፏል!");
     closeSendMsg();
   } catch(e) {
-    console.error("[sendAdminMsg] error:", e);
-    toast("\u274C Error: " + e.message);
+    toast("❌ Error: " + e.message);
   }
 }
 window.sendAdminMsg = sendAdminMsg;
@@ -2515,14 +2552,7 @@ function closeNotifInbox() {
 window.closeNotifInbox = closeNotifInbox;
 
 function startNotifListener() {
-  console.log("[startNotifListener] attaching listener for UID:", UID);
   onValue(ref(db, "users/" + UID + "/notifications"), snap => {
-    console.log("[notifListener] fired! exists:", snap.exists());
-    if (snap.exists()) {
-      const keys = [];
-      snap.forEach(c => keys.push(c.key + "=" + JSON.stringify(c.val()).substring(0,60)));
-      console.log("[notifListener] children:", keys);
-    }
     const list  = document.getElementById("notifList");
     const badge = document.getElementById("notifBadge");
     if (!list) return;
