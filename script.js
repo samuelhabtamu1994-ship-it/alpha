@@ -1640,12 +1640,11 @@ async function submitDeposit() {
   if (!amt || amt < 50) { toast("⚠ ቢያንስ 50 ETB ያስገቡ!"); return; }
   if (!sms) { toast("⚠ Transaction ID ወይም SMS ያስገቡ!"); return; }
 
-  // 1. Save to Firebase first
+  // Firebase ላይ save — Railway server depositRequests listener ወዲያውኑ ያነሳዋል
   const txRef    = push(ref(db, `users/${UID}/transactions`));
   const adminRef = push(ref(db, `depositRequests`));
-
-  const txKey  = txRef.key;
-  const reqKey = adminRef.key;
+  const txKey    = txRef.key;
+  const reqKey   = adminRef.key;
 
   await set(txRef, {
     type: "deposit", status: "pending",
@@ -1667,26 +1666,6 @@ async function submitDeposit() {
   $("depSms").value    = "";
   toast("✅ ጥያቄዎ ተልኳል! በራስሰር እየተረጋገጠ ነው...");
   loadDepositHistory();
-
-  // 2. Notify Railway server — SMS ቅድሚያ ከደረሰ ወዲያውኑ approve ያደርጋል
-  const RAILWAY_URL    = "https://YOUR-RAILWAY-URL.up.railway.app";
-  const WEBHOOK_SECRET = "YOUR-SECRET-KEY";
-  try {
-    await fetch(`${RAILWAY_URL}/deposit-request`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret: WEBHOOK_SECRET,
-        uid:    UID,
-        reqKey,
-        amount: amt,
-        sms
-      })
-    });
-  } catch(e) {
-    // Network error — server timeout checker ይወስደዋል
-    console.warn("[deposit-request] server notify failed:", e.message);
-  }
 }
 window.submitDeposit = submitDeposit;
 
