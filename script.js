@@ -1887,20 +1887,23 @@ function loadAdminPanel() {
   _listenDeposits();
   _listenWithdraws();
   _listenUsers();
+  loadBotSettings();
 }
 
 // ── Tab switching ──────────────────────────────────────────────
 function adminTab(tab) {
-  const tabs   = ["deposit", "withdraw", "users"];
+  const tabs   = ["deposit", "withdraw", "users", "settings"];
   const panels = {
     deposit:  document.getElementById("adminPanelDeposit"),
     withdraw: document.getElementById("adminPanelWithdraw"),
-    users:    document.getElementById("adminPanelUsers")
+    users:    document.getElementById("adminPanelUsers"),
+    settings: document.getElementById("adminPanelSettings")
   };
   const btns = {
     deposit:  document.getElementById("tabDeposit"),
     withdraw: document.getElementById("tabWithdraw"),
-    users:    document.getElementById("tabUsers")
+    users:    document.getElementById("tabUsers"),
+    settings: document.getElementById("tabSettings")
   };
   tabs.forEach(t => {
     if (panels[t]) panels[t].style.display = (t === tab) ? "block" : "none";
@@ -1908,6 +1911,44 @@ function adminTab(tab) {
   });
 }
 window.adminTab = adminTab;
+
+// ── Bot Settings (Firebase botSettings/) ──────────────────────
+const BOT_SETTINGS_DEFAULTS = {
+  startPhotoUrl: "https://i.ibb.co/W4nzSG8v/1772942535161.png",
+  startCaption:  "🔥FIRST DEPOSIT 50% BONUS🔥",
+  depositName:   "Getachew Abera",
+  depositPhone:  "0990633294"
+};
+
+async function loadBotSettings() {
+  const snap = await get(ref(db, "botSettings"));
+  const cfg  = snap.exists() ? snap.val() : {};
+  const merged = { ...BOT_SETTINGS_DEFAULTS, ...cfg };
+
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  setVal("settingDepositName",   merged.depositName);
+  setVal("settingDepositPhone",  merged.depositPhone);
+  setVal("settingStartPhotoUrl", merged.startPhotoUrl);
+  setVal("settingStartCaption",  merged.startCaption);
+}
+
+async function saveDepositSettings() {
+  const name  = document.getElementById("settingDepositName")?.value.trim();
+  const phone = document.getElementById("settingDepositPhone")?.value.trim();
+  if (!name || !phone) { toast("⚠ ስም እና ቁጥር ያስፈልጋሉ"); return; }
+  await update(ref(db, "botSettings"), { depositName: name, depositPhone: phone });
+  toast("✅ TeleBirr account ተዘምኗል!");
+}
+window.saveDepositSettings = saveDepositSettings;
+
+async function saveStartSettings() {
+  const photoUrl = document.getElementById("settingStartPhotoUrl")?.value.trim();
+  const caption  = document.getElementById("settingStartCaption")?.value.trim();
+  if (!photoUrl) { toast("⚠ Photo URL ያስፈልጋል"); return; }
+  await update(ref(db, "botSettings"), { startPhotoUrl: photoUrl, startCaption: caption });
+  toast("✅ /start ምስልና ፅሁፍ ተዘምኗል!");
+}
+window.saveStartSettings = saveStartSettings;
 
 // ── Stats counters ─────────────────────────────────────────────
 function _listenStats() {
@@ -2659,3 +2700,4 @@ async function markNotifsRead() {
   });
   if (Object.keys(upd).length) await update(ref(db), upd);
 }
+// (CSS injected inline for settings panel)
