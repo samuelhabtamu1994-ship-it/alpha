@@ -1032,3 +1032,7 @@ input { outline: none; }
 .notif-bell-btn{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;position:relative;padding:4px}
 #notifBadge{position:absolute;top:0;right:0;background:#ff4444;color:#fff;border-radius:50%;font-size:.55rem;width:14px;height:14px;display:none;align-items:center;justify-content:center;font-weight:700}
 #notifBadge.show{display:flex}
+
+/* ── Bonus banner ────────────────────────────────────────── */
+.bonus-banner{background:linear-gradient(135deg,rgba(0,200,83,.15),rgba(0,230,118,.08));border:1px solid rgba(0,200,83,.35);border-radius:12px;padding:10px 14px;color:#00e676;font-size:.82rem;font-weight:700;text-align:center;margin-bottom:14px;animation:bonusPulse 2s infinite}
+@keyframes bonusPulse{0%,100%{opacity:1}50%{opacity:.75}}
