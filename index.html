@@ -60,10 +60,15 @@
       <span class="tb-coin">💰</span>
       <span id="topBalance">0</span>
     </div>
-    <div class="top-logo">BARON<span>BINGO</span></div>
-    <button class="menu-toggle" onclick="openMenu()">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="top-logo">ALPHA<span>BINGO</span></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="notif-bell-btn" onclick="openNotifInbox()">
+        🔔<span id="notifBadge"></span>
+      </button>
+      <button class="menu-toggle" onclick="openMenu()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </header>
 
   <!-- SCREENS CONTAINER -->
@@ -337,10 +342,145 @@
 
   <!-- Firebase -->
   <script type="module" src="script.js?v=6"></script>
+
+  <!-- ═══════════════════════════════════════════════
+       NOTIFICATION MODAL
+  ════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="notifOverlay" onclick="closeNotifInbox()"></div>
+  <div class="bottom-sheet-modal" id="notifModal">
+    <div class="bsm-header">
+      <span class="bsm-title">🔔 ማሳወቂያዎች</span>
+      <button class="bsm-close" onclick="closeNotifInbox()">✕</button>
+    </div>
+    <div id="notifList" class="notif-list"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SEND MESSAGE MODAL
+  ════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="sendMsgOverlay" onclick="closeSendMsg()"></div>
+  <div class="bottom-sheet-modal" id="sendMsgModal">
+    <div class="bsm-header">
+      <span class="bsm-title">✉️ ሜሴጅ ላክ</span>
+      <button class="bsm-close" onclick="closeSendMsg()">✕</button>
+    </div>
+    <textarea class="bsm-textarea" id="sendMsgText" rows="4" placeholder="መልእክት ይፃፉ..."></textarea>
+    <button class="cta-btn" style="margin-top:10px" onclick="sendAdminMsg()">📤 ላክ</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       USER PROFILE MODAL (ADMIN)
+  ════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="userProfileOverlay" onclick="closeUserProfile()"></div>
+  <div class="full-modal" id="userProfileModal">
+    <div class="fm-header">
+      <button class="fm-back" onclick="closeUserProfile()">❮</button>
+      <span class="fm-title">የተጠቃሚ መረጃ</span>
+      <div style="width:32px"></div>
+    </div>
+    <div class="fm-body">
+      <!-- Avatar + name -->
+      <div class="upm-header">
+        <div class="upm-avatar" id="upmAvatar">?</div>
+        <div class="upm-info">
+          <div class="upm-name" id="upmName">—</div>
+          <div class="upm-username" id="upmUsername">—</div>
+          <div class="upm-id" id="upmId">—</div>
+        </div>
+      </div>
+      <!-- Stats -->
+      <div class="upm-stats-grid">
+        <div class="upm-stat"><div class="upm-stat-val" id="upmBalance">—</div><div class="upm-stat-lbl">Balance (ETB)</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmJoined">—</div><div class="upm-stat-lbl">ተመዝግቦ</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmDepCount">—</div><div class="upm-stat-lbl">Deposits</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmDepTotal">—</div><div class="upm-stat-lbl">Dep Total</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmWdCount">—</div><div class="upm-stat-lbl">Withdrawals</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmWdTotal">—</div><div class="upm-stat-lbl">Wd Total</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmGames">—</div><div class="upm-stat-lbl">Games</div></div>
+        <div class="upm-stat"><div class="upm-stat-val" id="upmWins">—</div><div class="upm-stat-lbl">Wins</div></div>
+      </div>
+      <!-- Action buttons -->
+      <div class="upm-actions">
+        <button class="upm-btn upm-btn-msg" onclick="openSendMsg()">✉️ ሜሴጅ</button>
+        <button class="upm-btn upm-btn-bal" onclick="adjustCurrentBalance()">💰 Balance</button>
+      </div>
+      <!-- Transaction list -->
+      <div class="upm-tx-title">📋 የቅርብ ጊዜ ግብይቶች</div>
+      <div id="upmTxList" class="upm-tx-list"></div>
+    </div>
+  </div>
+
 </body>
-</html>
+
 <style>
-/* ─── Settings Panel ─────────────────────────────────── */
+/* ─── Avatar everywhere ─────────────────────────────── */
+.ac-mini-avatar {
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,#1565c0,#1976d2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.8rem;font-weight:700;color:#fff;
+  flex-shrink:0;margin-right:8px;
+  background-size:cover;background-position:center;
+}
+
+/* ─── Bottom sheet modals ───────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;display:none}
+.modal-overlay.active{display:block}
+.bottom-sheet-modal{position:fixed;bottom:0;left:0;right:0;background:#1a1a2e;border-radius:20px 20px 0 0;padding:16px;z-index:901;max-height:75vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease}
+.bottom-sheet-modal.active{transform:translateY(0)}
+.bsm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bsm-title{font-weight:700;font-size:.95rem;color:#fff}
+.bsm-close{background:none;border:none;color:rgba(255,255,255,.6);font-size:1.2rem;cursor:pointer;padding:4px 8px}
+.bsm-textarea{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font-size:.85rem;padding:10px 12px;box-sizing:border-box;font-family:inherit;resize:none}
+.notif-list{display:flex;flex-direction:column;gap:8px;padding-bottom:8px}
+.notif-item{background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px}
+.notif-item.unread{border-left:3px solid #00e5ff}
+.notif-msg{font-size:.83rem;color:#fff;line-height:1.5}
+.notif-time{font-size:.65rem;color:rgba(255,255,255,.35);margin-top:4px}
+
+/* ─── Full screen modal ─────────────────────────────── */
+.full-modal{position:fixed;inset:0;background:#0d0d1a;z-index:901;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s ease}
+.full-modal.active{transform:translateX(0)}
+.fm-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.fm-back{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:4px 8px}
+.fm-title{font-weight:700;font-size:.95rem;color:#fff}
+.fm-body{flex:1;overflow-y:auto;padding:16px}
+
+/* ─── User profile modal ────────────────────────────── */
+.upm-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.upm-avatar{
+  width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(135deg,#1565c0,#42a5f5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.6rem;font-weight:900;color:#fff;flex-shrink:0;
+  background-size:cover;background-position:center;
+}
+.upm-name{font-weight:700;font-size:1rem;color:#fff}
+.upm-username{font-size:.78rem;color:rgba(255,255,255,.5);margin-top:3px}
+.upm-id{font-size:.7rem;color:rgba(255,255,255,.3);margin-top:2px}
+.upm-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.upm-stat{background:rgba(255,255,255,.05);border-radius:10px;padding:10px 6px;text-align:center}
+.upm-stat-val{font-weight:800;font-size:.95rem;color:#fff}
+.upm-stat-lbl{font-size:.6rem;color:rgba(255,255,255,.4);margin-top:3px}
+.upm-actions{display:flex;gap:8px;margin-bottom:16px}
+.upm-btn{flex:1;padding:11px;border:none;border-radius:11px;font-size:.85rem;font-weight:700;cursor:pointer;color:#fff}
+.upm-btn-msg{background:linear-gradient(135deg,#5500cc,#8833ff)}
+.upm-btn-bal{background:linear-gradient(135deg,#1565c0,#1976d2)}
+.upm-tx-title{font-size:.8rem;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:10px}
+.upm-tx-list{display:flex;flex-direction:column;gap:8px}
+.upm-tx-item{background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.upm-tx-left{display:flex;flex-direction:column;gap:3px}
+.upm-tx-type{font-size:.8rem;font-weight:700;color:#fff}
+.upm-tx-date{font-size:.65rem;color:rgba(255,255,255,.3)}
+.upm-tx-amount{font-weight:800;font-size:.95rem}
+.upm-tx-status{font-size:.65rem;margin-top:2px}
+
+/* ─── Notif bell ────────────────────────────────────── */
+.notif-bell-btn{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;position:relative;padding:4px}
+#notifBadge{position:absolute;top:0;right:0;background:#ff4444;color:#fff;border-radius:50%;font-size:.55rem;width:14px;height:14px;display:none;align-items:center;justify-content:center;font-weight:700}
+#notifBadge.show{display:flex}
+
+/* ─── Settings panel ────────────────────────────────── */
 .settings-panel{padding:14px 12px;display:flex;flex-direction:column;gap:14px}
 .settings-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
 .settings-card-title{font-size:.9rem;font-weight:700;color:#fff;margin-bottom:4px}
@@ -352,3 +492,5 @@
 .settings-textarea{resize:none;min-height:72px}
 .settings-save-btn{width:100%;margin-top:14px;padding:12px;background:linear-gradient(135deg,#1565c0,#1976d2);color:#fff;border:none;border-radius:11px;font-size:.88rem;font-weight:700;cursor:pointer}
 </style>
+
+</html>
