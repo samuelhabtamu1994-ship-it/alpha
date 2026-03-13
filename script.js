@@ -185,32 +185,55 @@ function updateBalanceUI() {
 }
 
 // ===== USER INIT =====
-async function initUser() {
-  const uRef = ref(db, `users/${UID}`);
-  const snap = await get(uRef);
+// helper — avatar element ን photo ወይም initials ያሳያል
+function _setAvatar(el, photoUrl, name) {
+  if (!el) return;
+  if (photoUrl) {
+    el.style.backgroundImage  = "url(" + photoUrl + ")";
+    el.style.backgroundSize   = "cover";
+    el.style.backgroundPosition = "center";
+    el.textContent = "";
+  } else {
+    el.style.backgroundImage = "";
+    el.textContent = (name?.[0] || "?").toUpperCase();
+  }
+}
 
-  $("menuAvatar").textContent = (tgUser.first_name?.[0] || "?").toUpperCase();
-  $("menuName").textContent   = `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim() || "Player";
-  $("menuPhone").textContent  = "Telegram ID: " + UID;
+async function initUser() {
+  const uRef  = ref(db, `users/${UID}`);
+  const snap  = await get(uRef);
+  const photo = tgUser.photo_url || null;
+
+  // Menu avatar
+  _setAvatar($("menuAvatar"), photo, tgUser.first_name);
+  $("menuName").textContent  = `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim() || "Player";
+  $("menuPhone").textContent = "Telegram ID: " + UID;
 
   if (!snap.exists()) {
-    // New user
     await set(uRef, {
-      uid: UID,
-      name: `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
-      username: tgUser.username || "",
-      balance: 0,
+      uid:       UID,
+      name:      `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
+      username:  tgUser.username || "",
+      photo_url: photo || "",
+      balance:   0,
       createdAt: serverTimestamp()
     });
     userBalance = 0;
   } else {
-    userBalance = snap.val().balance || 0;
-    // Phone from firebase if stored
-    const ph = snap.val().phone;
+    const val = snap.val();
+    userBalance = val.balance || 0;
+    const ph = val.phone;
     if (ph) $("menuPhone").textContent = ph;
+    // photo_url ዘምን ካለ update
+    if (photo && photo !== val.photo_url) {
+      update(uRef, { photo_url: photo });
+    }
+    // ካልሆነ firebase ላይ ያለውን ጠቀም
+    if (!photo && val.photo_url) {
+      _setAvatar($("menuAvatar"), val.photo_url, val.name || tgUser.first_name);
+    }
   }
 
-  // Live balance listener
   onValue(ref(db, `users/${UID}/balance`), snap => {
     userBalance = snap.val() || 0;
     updateBalanceUI();
@@ -2098,11 +2121,23 @@ function _makeDepCard(item) {
   // Row 1: user info + amount
   const row1 = document.createElement("div");
   row1.className = "ac-row";
+
+  // Mini avatar (async load from firebase)
+  const depAv = document.createElement("div");
+  depAv.className = "ac-mini-avatar";
+  depAv.textContent = (item.username?.[0] || "?").toUpperCase();
+  depAv.style.cursor = "pointer";
+  depAv.addEventListener("click", () => openUserProfile(item.uid));
+  get(ref(db, "users/" + item.uid + "/photo_url")).then(ps => {
+    if (ps.exists() && ps.val()) _setAvatar(depAv, ps.val(), item.username);
+  });
+
   const userDiv  = _el("div", "ac-user");
   userDiv.style.cursor = "pointer";
   userDiv.appendChild(_el("div", "ac-name", "@" + (item.username || "unknown")));
   userDiv.appendChild(_el("div", "ac-uid",  "ID: " + item.uid));
   userDiv.addEventListener("click", () => openUserProfile(item.uid));
+  row1.appendChild(depAv);
   row1.appendChild(userDiv);
   row1.appendChild(_el("div", "ac-amount pos", "+" + item.amount + " ETB"));
   card.appendChild(row1);
@@ -2276,11 +2311,22 @@ function _makeWdCard(item) {
   // Row 1
   const row1 = document.createElement("div");
   row1.className = "ac-row";
+
+  const wdAv = document.createElement("div");
+  wdAv.className = "ac-mini-avatar";
+  wdAv.textContent = (item.username?.[0] || "?").toUpperCase();
+  wdAv.style.cursor = "pointer";
+  wdAv.addEventListener("click", () => openUserProfile(item.uid));
+  get(ref(db, "users/" + item.uid + "/photo_url")).then(ps => {
+    if (ps.exists() && ps.val()) _setAvatar(wdAv, ps.val(), item.username);
+  });
+
   const userDiv = _el("div", "ac-user");
   userDiv.style.cursor = "pointer";
   userDiv.appendChild(_el("div", "ac-name", "@" + (item.username || "unknown")));
   userDiv.appendChild(_el("div", "ac-uid",  "ID: " + item.uid));
   userDiv.addEventListener("click", () => openUserProfile(item.uid));
+  row1.appendChild(wdAv);
   row1.appendChild(userDiv);
   row1.appendChild(_el("div", "ac-amount neg", "-" + item.amount + " ETB"));
   card.appendChild(row1);
@@ -2404,9 +2450,10 @@ function _listenUsers() {
       const v = s.val();
       users.push({
         uid:       s.key,
-        name:      v.name     || "",
-        username:  v.username || "",
-        balance:   v.balance  || 0,
+        name:      v.name      || "",
+        username:  v.username  || "",
+        balance:   v.balance   || 0,
+        photo_url: v.photo_url || "",
         createdAt: v.createdAt || 0
       });
     });
@@ -2419,9 +2466,17 @@ function _listenUsers() {
 
       const row1 = document.createElement("div");
       row1.className = "ac-row";
+
+      // Mini avatar
+      const miniAv = document.createElement("div");
+      miniAv.className = "ac-mini-avatar";
+      _setAvatar(miniAv, u.photo_url, u.name || u.username);
+
       const userDiv = _el("div", "ac-user");
       userDiv.appendChild(_el("div", "ac-name", u.name || u.username || "Unknown"));
       userDiv.appendChild(_el("div", "ac-uid", "@" + (u.username || "—") + " · ID: " + u.uid));
+
+      row1.appendChild(miniAv);
       row1.appendChild(userDiv);
       row1.appendChild(_el("div", "ac-amount pos", u.balance.toFixed(2) + " ETB"));
       card.appendChild(row1);
@@ -2512,7 +2567,8 @@ async function openUserProfile(uid) {
     const displayName = u.name || u.username || "Unknown";
     _currentMsgUsername = displayName;
 
-    document.getElementById("upmAvatar").textContent    = (displayName[0] || "?").toUpperCase();
+    const upmAv = document.getElementById("upmAvatar");
+    _setAvatar(upmAv, u.photo_url || "", displayName);
     document.getElementById("upmName").textContent      = displayName;
     document.getElementById("upmUsername").textContent  = "@" + (u.username || "—");
     document.getElementById("upmId").textContent        = "Telegram ID: " + uid;
