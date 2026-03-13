@@ -145,7 +145,23 @@ function closeMenu() {
 }
 window.openMenu  = openMenu;
 window.closeMenu = closeMenu;
-window.openDeposit = () => { showScreen("screen-deposit"); loadDepositHistory(); };
+window.openDeposit = async () => {
+  showScreen("screen-deposit");
+  loadDepositHistory();
+  // Firebase botSettings ከ ስምና ቁጥር ያዘምናል
+  try {
+    const snap = await get(ref(db, "botSettings"));
+    const cfg  = snap.exists() ? snap.val() : {};
+    const name  = cfg.depositName  || "Getachew Abera";
+    const phone = cfg.depositPhone || "0990633294";
+    const nameEl  = document.getElementById("depositAccountName");
+    const phoneEl = document.getElementById("depositPhone");
+    if (nameEl)  nameEl.textContent  = name;
+    if (phoneEl) phoneEl.textContent = phone;
+  } catch(e) {
+    console.error("[openDeposit] settings load error:", e);
+  }
+};
 window.openWithdraw = () => {
   showScreen("screen-withdraw");
   $("withdrawBalanceDisplay").textContent = userBalance.toFixed(2) + " ETB";
@@ -1909,6 +1925,8 @@ function adminTab(tab) {
     if (panels[t]) panels[t].style.display = (t === tab) ? "block" : "none";
     if (btns[t])   btns[t].classList.toggle("active", t === tab);
   });
+  // settings tab ሲከፈት fresh load
+  if (tab === "settings") loadBotSettings();
 }
 window.adminTab = adminTab;
 
@@ -1936,8 +1954,22 @@ async function saveDepositSettings() {
   const name  = document.getElementById("settingDepositName")?.value.trim();
   const phone = document.getElementById("settingDepositPhone")?.value.trim();
   if (!name || !phone) { toast("⚠ ስም እና ቁጥር ያስፈልጋሉ"); return; }
-  await update(ref(db, "botSettings"), { depositName: name, depositPhone: phone });
-  toast("✅ TeleBirr account ተዘምኗል!");
+  try {
+    // set() ን ጠቀምን — botSettings node ን ሙሉ ለሙሉ ይፈጥራል ካልሰነ
+    const settingsRef = ref(db, "botSettings");
+    const snap = await get(settingsRef);
+    const current = snap.exists() ? snap.val() : {};
+    await set(settingsRef, {
+      ...current,
+      depositName:  name,
+      depositPhone: phone
+    });
+    toast("✅ TeleBirr account ተዘምኗል!");
+    console.log("[settings] saved depositName="+name+" depositPhone="+phone);
+  } catch(e) {
+    console.error("[settings] save error:", e);
+    toast("❌ Error: " + e.message);
+  }
 }
 window.saveDepositSettings = saveDepositSettings;
 
