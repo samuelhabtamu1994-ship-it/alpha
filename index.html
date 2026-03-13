@@ -257,7 +257,23 @@
             <button class="settings-save-btn" onclick="saveDepositSettings()">💾 ለውጥ አስቀምጥ</button>
           </div>
 
-          <!-- 2. /start Photo & Text -->
+          <!-- 2. First Deposit Bonus -->
+          <div class="settings-card">
+            <div class="settings-card-title">🎁 First Deposit Bonus</div>
+            <div class="settings-card-sub">አዲስ user የመጀመሪያ deposit ሲያደርግ bonus % ይጨመርለታል</div>
+            <div class="settings-toggle-row">
+              <span class="settings-field-label" style="margin:0">Bonus አስችል / አቦዝን</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingBonusEnabled" onchange="saveFirstDepositSettings()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-field-label">Bonus % (ምሳሌ: 50 = 50%)</div>
+            <input type="number" class="settings-input" id="settingBonusPercent" placeholder="50" min="1" max="200" oninput="saveFirstDepositSettings()" />
+            <div class="settings-bonus-preview" id="bonusPreview">100 ETB deposit → 150 ETB ይቀበላሉ</div>
+          </div>
+
+          <!-- 3. /start Photo & Text -->
           <div class="settings-card">
             <div class="settings-card-title">🖼 /start ምስልና ፅሁፍ</div>
             <div class="settings-card-sub">Bot ላይ /start ሲጫኑ የሚወጣው ምስልና ፅሁፍ</div>
@@ -491,6 +507,15 @@
 .settings-input:focus{outline:none;border-color:rgba(100,181,246,.5)}
 .settings-textarea{resize:none;min-height:72px}
 .settings-save-btn{width:100%;margin-top:14px;padding:12px;background:linear-gradient(135deg,#1565c0,#1976d2);color:#fff;border:none;border-radius:11px;font-size:.88rem;font-weight:700;cursor:pointer}
+/* toggle switch */
+.settings-toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.toggle-switch{position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,.15);border-radius:26px;cursor:pointer;transition:.3s}
+.toggle-slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle-switch input:checked + .toggle-slider{background:#00c853}
+.toggle-switch input:checked + .toggle-slider:before{transform:translateX(22px)}
+.settings-bonus-preview{font-size:.75rem;color:#00e676;margin-top:8px;padding:8px 10px;background:rgba(0,200,83,.08);border-radius:8px;text-align:center}
 </style>
 
 </html>
