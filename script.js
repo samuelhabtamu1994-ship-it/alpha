@@ -2197,11 +2197,12 @@ function _listenDeposits() {
 async function _approveDeposit(key, uid, amount) {
   if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
   try {
-    // approvedBy = admin UID — "manual" መሆኑን ያሳያል
+    // approvedBy = UID (manual), telegramNotified=false → bot listener ወዲያውኑ ይልካል
     await update(ref(db, "depositRequests/" + key), {
-      status:     "approved",
-      approvedBy: UID,          // admin UID — "auto" አይደለም ስለዚህ manual ነው
-      approvedAt: serverTimestamp()
+      status:             "approved",
+      approvedBy:         UID,
+      approvedAt:         serverTimestamp(),
+      telegramNotified:   false      // ← bot listener ይህን ያያል → Telegram ይልካል
     });
 
     // Update user transaction
@@ -2223,7 +2224,7 @@ async function _approveDeposit(key, uid, amount) {
     const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
     await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
 
-    // Notify user
+    // Mini app notification
     await set(push(ref(db, "users/" + uid + "/notifications")), {
       from:    "Alpha Bingo",
       message: "✅ " + amount + " ETB deposit ተረጋግጧል! ሂሳብዎ ተዘምኗል።",
