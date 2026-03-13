@@ -148,16 +148,33 @@ window.closeMenu = closeMenu;
 window.openDeposit = async () => {
   showScreen("screen-deposit");
   loadDepositHistory();
-  // Firebase botSettings ከ ስምና ቁጥር ያዘምናል
   try {
-    const snap = await get(ref(db, "botSettings"));
-    const cfg  = snap.exists() ? snap.val() : {};
-    const name  = cfg.depositName  || "Getachew Abera";
-    const phone = cfg.depositPhone || "0990633294";
+    const [cfgSnap, userSnap] = await Promise.all([
+      get(ref(db, "botSettings")),
+      get(ref(db, "users/" + UID))
+    ]);
+    const cfg  = cfgSnap.exists()  ? cfgSnap.val()  : {};
+    const user = userSnap.exists() ? userSnap.val() : {};
+
+    // ስምና ቁጥር
     const nameEl  = document.getElementById("depositAccountName");
     const phoneEl = document.getElementById("depositPhone");
-    if (nameEl)  nameEl.textContent  = name;
-    if (phoneEl) phoneEl.textContent = phone;
+    if (nameEl)  nameEl.textContent  = cfg.depositName  || "Getachew Abera";
+    if (phoneEl) phoneEl.textContent = cfg.depositPhone || "0990633294";
+
+    // Bonus banner
+    const banner = document.getElementById("bonusBanner");
+    if (banner) {
+      const isFirst  = !user.firstDepositDone;
+      const bonusOn  = cfg.firstDepositBonus === true;
+      const pct      = cfg.firstDepositBonusPct || 50;
+      if (isFirst && bonusOn) {
+        banner.textContent = "🎁 First Deposit Bonus " + pct + "% — ዛሬ ይጠቀሙ!";
+        banner.style.display = "block";
+      } else {
+        banner.style.display = "none";
+      }
+    }
   } catch(e) {
     console.error("[openDeposit] settings load error:", e);
   }
@@ -2269,11 +2286,26 @@ function _listenDeposits() {
 async function _approveDeposit(key, uid, amount) {
   if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
   try {
+    // bonusAmount ለ bot listener ቀደም ሲሉ ስናውቅ ነው ስለዚህ request ን ዘምነናል
+    // ቅድሚያ bonus አስሉ ከዛ request update
+    const _userSnapPre = await get(ref(db, "users/" + uid));
+    const _userPre     = _userSnapPre.exists() ? _userSnapPre.val() : {};
+    const _isFirstPre  = !_userPre.firstDepositDone;
+    let _preBonus = 0;
+    if (_isFirstPre) {
+      const _cfgPre = await get(ref(db, "botSettings"));
+      const _cfg    = _cfgPre.exists() ? _cfgPre.val() : {};
+      if (_cfg.firstDepositBonus === true) {
+        _preBonus = +((amount * (_cfg.firstDepositBonusPct || 50)) / 100).toFixed(2);
+      }
+    }
+
     await update(ref(db, "depositRequests/" + key), {
       status:           "approved",
       approvedBy:       UID,
       approvedAt:       serverTimestamp(),
-      telegramNotified: false
+      telegramNotified: false,
+      bonusAmount:      _preBonus     // bot listener ይህን ያነባል
     });
 
     // Update user transaction status
@@ -2290,21 +2322,11 @@ async function _approveDeposit(key, uid, amount) {
       if (Object.keys(upd).length) await update(ref(db), upd);
     }
 
-    // ── First Deposit Bonus check ─────────────────────────
+    // ── First Deposit Bonus (ቀደም ሲሉ ተሰልቷል — _preBonus) ──
     let creditAmount = amount;
-    let bonusAmount  = 0;
-    const userSnap   = await get(ref(db, "users/" + uid));
-    const userData   = userSnap.exists() ? userSnap.val() : {};
-    const isFirst    = !userData.firstDepositDone;
-
-    if (isFirst) {
-      const cfgSnap = await get(ref(db, "botSettings"));
-      const cfg     = cfgSnap.exists() ? cfgSnap.val() : {};
-      if (cfg.firstDepositBonus === true) {
-        const pct   = cfg.firstDepositBonusPct || 50;
-        bonusAmount = +(amount * pct / 100).toFixed(2);
-        creditAmount = +(amount + bonusAmount).toFixed(2);
-      }
+    let bonusAmount  = _preBonus;
+    creditAmount     = +( amount + bonusAmount ).toFixed(2);
+    if (_isFirstPre) {
       await update(ref(db, "users/" + uid), { firstDepositDone: true });
     }
 
