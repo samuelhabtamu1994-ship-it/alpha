@@ -1944,7 +1944,7 @@ function launchConfetti() {
 }
 
 // ===== INIT APP =====
-const ADMIN_ID = "6452034854";
+const ADMIN_ID = "979887945";
 const IS_ADMIN = UID === ADMIN_ID;
 
 async function init() {
