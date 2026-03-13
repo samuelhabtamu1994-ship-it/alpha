@@ -2008,6 +2008,12 @@ async function loadBotSettings() {
   const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   setVal("settingDepositName",   merged.depositName);
   setVal("settingDepositPhone",  merged.depositPhone);
+  // First deposit bonus
+  const bonusEl = document.getElementById("settingBonusEnabled");
+  if (bonusEl) bonusEl.checked = merged.firstDepositBonus === true;
+  const pctEl = document.getElementById("settingBonusPercent");
+  if (pctEl) pctEl.value = merged.firstDepositBonusPct || 50;
+  _updateBonusPreview();
   setVal("settingStartPhotoUrl", merged.startPhotoUrl);
   setVal("settingStartCaption",  merged.startCaption);
 }
@@ -2043,6 +2049,37 @@ async function saveStartSettings() {
   toast("✅ /start ምስልና ፅሁፍ ተዘምኗል!");
 }
 window.saveStartSettings = saveStartSettings;
+
+function _updateBonusPreview() {
+  const enabled = document.getElementById("settingBonusEnabled")?.checked;
+  const pct     = parseFloat(document.getElementById("settingBonusPercent")?.value) || 50;
+  const prev    = document.getElementById("bonusPreview");
+  if (!prev) return;
+  if (!enabled) {
+    prev.textContent = "❌ Bonus ዝግ ነው";
+    prev.style.color = "rgba(255,255,255,0.35)";
+  } else {
+    const ex = 100;
+    const gets = (ex + ex * pct / 100).toFixed(0);
+    prev.textContent = ex + " ETB deposit → " + gets + " ETB ይቀበላሉ";
+    prev.style.color = "#00e676";
+  }
+}
+window._updateBonusPreview = _updateBonusPreview;
+
+async function saveFirstDepositSettings() {
+  _updateBonusPreview();
+  const enabled = document.getElementById("settingBonusEnabled")?.checked || false;
+  const pct     = parseFloat(document.getElementById("settingBonusPercent")?.value) || 50;
+  try {
+    const settingsRef = ref(db, "botSettings");
+    const snap = await get(settingsRef);
+    const current = snap.exists() ? snap.val() : {};
+    await set(settingsRef, { ...current, firstDepositBonus: enabled, firstDepositBonusPct: pct });
+    toast(enabled ? "✅ Bonus " + pct + "% ተቀምጧል!" : "❌ Bonus ተዘግቷል");
+  } catch(e) { toast("❌ Error: " + e.message); }
+}
+window.saveFirstDepositSettings = saveFirstDepositSettings;
 
 // ── Stats counters ─────────────────────────────────────────────
 function _listenStats() {
@@ -2232,15 +2269,14 @@ function _listenDeposits() {
 async function _approveDeposit(key, uid, amount) {
   if (!confirm(amount + " ETB approve ታደርጋለህ?")) return;
   try {
-    // approvedBy = UID (manual), telegramNotified=false → bot listener ወዲያውኑ ይልካል
     await update(ref(db, "depositRequests/" + key), {
-      status:             "approved",
-      approvedBy:         UID,
-      approvedAt:         serverTimestamp(),
-      telegramNotified:   false      // ← bot listener ይህን ያያል → Telegram ይልካል
+      status:           "approved",
+      approvedBy:       UID,
+      approvedAt:       serverTimestamp(),
+      telegramNotified: false
     });
 
-    // Update user transaction
+    // Update user transaction status
     const txSnap = await get(ref(db, "users/" + uid + "/transactions"));
     if (txSnap.exists()) {
       const upd = {};
@@ -2254,20 +2290,41 @@ async function _approveDeposit(key, uid, amount) {
       if (Object.keys(upd).length) await update(ref(db), upd);
     }
 
+    // ── First Deposit Bonus check ─────────────────────────
+    let creditAmount = amount;
+    let bonusAmount  = 0;
+    const userSnap   = await get(ref(db, "users/" + uid));
+    const userData   = userSnap.exists() ? userSnap.val() : {};
+    const isFirst    = !userData.firstDepositDone;
+
+    if (isFirst) {
+      const cfgSnap = await get(ref(db, "botSettings"));
+      const cfg     = cfgSnap.exists() ? cfgSnap.val() : {};
+      if (cfg.firstDepositBonus === true) {
+        const pct   = cfg.firstDepositBonusPct || 50;
+        bonusAmount = +(amount * pct / 100).toFixed(2);
+        creditAmount = +(amount + bonusAmount).toFixed(2);
+      }
+      await update(ref(db, "users/" + uid), { firstDepositDone: true });
+    }
+
     // Credit balance
     const balSnap = await get(ref(db, "users/" + uid + "/balance"));
     const cur = balSnap.exists() ? (balSnap.val() || 0) : 0;
-    await update(ref(db, "users/" + uid), { balance: +(cur + amount).toFixed(2) });
+    await update(ref(db, "users/" + uid), { balance: +(cur + creditAmount).toFixed(2) });
 
-    // Mini app notification
+    // Notification
+    const notifMsg = bonusAmount > 0
+      ? "✅ " + amount + " ETB deposit ጸድቋል! 🎁 +" + bonusAmount + " ETB bonus ተጨምሯል! ድምር: " + creditAmount + " ETB"
+      : "✅ " + amount + " ETB deposit ተረጋግጧል! ሂሳብዎ ተዘምኗል።";
     await set(push(ref(db, "users/" + uid + "/notifications")), {
-      from:    "Alpha Bingo",
-      message: "✅ " + amount + " ETB deposit ተረጋግጧል! ሂሳብዎ ተዘምኗል።",
-      read:    false,
-      ts:      serverTimestamp()
+      from: "Alpha Bingo", message: notifMsg, read: false, ts: serverTimestamp()
     });
 
-    toast("✅ " + amount + " ETB approved!");
+    const toastMsg = bonusAmount > 0
+      ? "✅ " + amount + " ETB + 🎁 " + bonusAmount + " ETB bonus = " + creditAmount + " ETB"
+      : "✅ " + amount + " ETB approved!";
+    toast(toastMsg);
   } catch (e) {
     console.error(e);
     toast("❌ Error: " + e.message);
