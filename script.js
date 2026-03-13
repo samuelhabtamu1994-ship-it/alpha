@@ -1649,40 +1649,79 @@ function leaveGame() {
 window.leaveGame = leaveGame;
 
 // ===== DEPOSIT =====
+
+// SMS ወይም transaction ID ከ raw text ያወጣል
+function _extractTxId(input) {
+  if (!input) return null;
+  // Full SMS ሆኖ ከ "transaction number is XXXXX" ቅርጽ ካለ ያውጣ
+  const match = input.match(/transaction\s+number\s+is\s+([A-Z0-9]+)/i);
+  if (match) return match[1].trim().toUpperCase();
+  // አጭር ID ብቻ ከሆነ (ከ 5 እስከ 20 chars) ቀጥታ ይጠቀም
+  const clean = input.trim().toUpperCase();
+  if (/^[A-Z0-9]{5,20}$/.test(clean)) return clean;
+  return null;
+}
+
 async function submitDeposit() {
   const amt = parseFloat($("depAmount").value);
   const sms = $("depSms").value.trim();
 
   if (!amt || amt < 50) { toast("⚠ ቢያንስ 50 ETB ያስገቡ!"); return; }
-  if (!sms) { toast("⚠ SMS ማረጋገጫ ያስፈልጋል!"); return; }
+  if (!sms) { toast("⚠ Transaction ID ወይም SMS ያስገቡ!"); return; }
 
-  // Save pending request to Firebase
-  const txRef = push(ref(db, `users/${UID}/transactions`));
+  // txId ያውጣ
+  const txId = _extractTxId(sms);
+  if (!txId) { toast("⚠ ትክክለኛ Transaction ID ያስገቡ (ምሳሌ: DCA7MX5IOZ)"); return; }
+
+  // ── Duplicate txId check ──────────────────────────────────
+  const usedSnap = await get(ref(db, `usedTxIds/${txId}`));
+  if (usedSnap.exists()) {
+    toast("❌ ይህ Transaction ID ቀደም ሲሉ ጥቅም ላይ ውሏል!");
+    return;
+  }
+
+  // ── Already pending with same txId? ─────────────────────
+  const myTxSnap = await get(ref(db, `users/${UID}/transactions`));
+  if (myTxSnap.exists()) {
+    let alreadyPending = false;
+    myTxSnap.forEach(child => {
+      const t = child.val();
+      if (t.type === "deposit" && t.txId === txId &&
+          (t.status === "pending" || t.status === "approved")) {
+        alreadyPending = true;
+      }
+    });
+    if (alreadyPending) {
+      toast("❌ ይህ Transaction ID ቀደም ሲሉ ጥቅም ላይ ውሏል!");
+      return;
+    }
+  }
+
+  // ── Save to Firebase ─────────────────────────────────────
+  const txRef    = push(ref(db, `users/${UID}/transactions`));
+  const adminRef = push(ref(db, `depositRequests`));
+  const txKey    = txRef.key;
+
   await set(txRef, {
-    type: "deposit",
-    status: "pending",
-    amount: amt,
-    sms,
+    type: "deposit", status: "pending",
+    amount: amt, sms, txId,
     uid: UID,
     username: tgUser.username || myUsername,
     ts: serverTimestamp()
   });
 
-  // Also save to admin requests
-  const adminRef = push(ref(db, `depositRequests`));
   await set(adminRef, {
     uid: UID,
     username: tgUser.username || myUsername,
     name: `${tgUser.first_name||""} ${tgUser.last_name||""}`.trim(),
-    amount: amt,
-    sms,
+    amount: amt, sms, txId, txKey,
     status: "pending",
     ts: serverTimestamp()
   });
 
   $("depAmount").value = "";
-  $("depSms").value = "";
-  toast("✅ ጥያቄዎ ተልኳል! ከ admin ማረጋገጫ ይጠብቁ");
+  $("depSms").value    = "";
+  toast("✅ ጥያቄዎ ተልኳል! በራስሰር እየተረጋገጠ ነው...");
   loadDepositHistory();
 }
 window.submitDeposit = submitDeposit;
