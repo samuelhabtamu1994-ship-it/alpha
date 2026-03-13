@@ -187,6 +187,7 @@
       </div>
       <div class="deposit-card">
         <div class="dc-title">💰 ገንዘብ ማስገቢያ</div>
+        <div class="bonus-banner" id="bonusBanner" style="display:none"></div>
         <div class="dc-field-label">የአካውንት ስም</div>
         <div class="dc-field-val" id="depositAccountName">Getachew Abera</div>
         <div class="dc-field-label">TeleBirr ቁጥር</div>
@@ -516,6 +517,8 @@
 .toggle-switch input:checked + .toggle-slider{background:#00c853}
 .toggle-switch input:checked + .toggle-slider:before{transform:translateX(22px)}
 .settings-bonus-preview{font-size:.75rem;color:#00e676;margin-top:8px;padding:8px 10px;background:rgba(0,200,83,.08);border-radius:8px;text-align:center}
+.bonus-banner{background:linear-gradient(135deg,rgba(0,200,83,.15),rgba(0,230,118,.08));border:1px solid rgba(0,200,83,.35);border-radius:12px;padding:10px 14px;color:#00e676;font-size:.82rem;font-weight:700;text-align:center;margin-bottom:14px;animation:bonusPulse 2s infinite}
+@keyframes bonusPulse{0%,100%{opacity:1}50%{opacity:.75}}
 </style>
 
 </html>
