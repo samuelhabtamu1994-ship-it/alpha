@@ -3,7 +3,7 @@
 //  Full production Telegram Mini App logic with Firebase Realtime DB
 // ==================================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fiase-app.js";
 import {
   getDatabase, ref, set, get, onValue, update, push, remove, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
