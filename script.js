@@ -313,8 +313,8 @@ function startCycleEngine() {
   STAKE_CONFIG.forEach(cfg => {
     if (NO_PLAYER_STAKES.has(cfg.amount)) return;
 
-    // Set initial display immediately on load
-    fluctuatePlayers(cfg.amount);
+    // Set initial display — snap immediately to correct range
+    resetPlayerCount(cfg.amount, cfg.min);
 
     setInterval(() => {
       // Always re-derive from real clock so all users stay in sync
@@ -345,7 +345,7 @@ function updateStakeCycleUI(amount) {
 
   // Only fluctuate during join phase — freeze count when game has started
   const displayedCountBefore = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
-  if (st.phase === "join" && Math.random() < 0.25) fluctuatePlayers(amount);
+  if (st.phase === "join") fluctuatePlayers(amount);
   const displayedCount = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
 
   // If 0 or 1 player showing — freeze timer at 30s, never show "started"
@@ -380,7 +380,13 @@ function updateStakeCycleUI(amount) {
 // Cache bot display max per stake — re-rolls once per cycle window
 const _botDisplayCache = {};
 function getBotDisplayMax(amount) {
-  if (amount === 10) return 18;  // always active, max 18
+  if (amount === 10) {
+    // Ethiopian clock: ቀን 6 (12:00 EAT) to ሌሊት 6 (00:00 EAT) → display up to 90
+    //                  ሌሊት 6 (00:00 EAT) to ቀን 6 (12:00 EAT) → display up to 20
+    // EAT = UTC+3
+    const _eatHour10d = (new Date().getUTCHours() + 3) % 24;
+    return _eatHour10d >= 12 ? 90 : 20;
+  }
 
   // Use cycle window as cache key so it re-rolls each new join phase
   const cycleKey = Math.floor(Date.now() / (JOIN_SEC * 1000));
@@ -443,8 +449,16 @@ function fluctuatePlayers(amount) {
     return;
   }
 
-  const minDisplay = amount === 10 ? cfg.min : 1;
-  const cur = parseInt(el.textContent) || minDisplay;
+  let minDisplay;
+  if (amount === 10) {
+    // EAT = UTC+3: ቀን 6 (12:00 EAT) → 40-90 bots, ሌሊት 6 (00:00 EAT) → 0-20 bots
+    const _eatH = (new Date().getUTCHours() + 3) % 24;
+    minDisplay = _eatH >= 12 ? 40 : 0;
+  } else {
+    minDisplay = 1;
+  }
+  // Snap cur into valid range immediately (handles time-of-day transitions)
+  const cur = Math.min(Math.max(parseInt(el.textContent) || minDisplay, minDisplay), maxBots);
   const chg = Math.random() > 0.45 ? Math.floor(Math.random() * 3) + 1 : -Math.floor(Math.random() * 2);
   const nxt = Math.min(Math.max(cur + chg, minDisplay), maxBots);
   el.textContent = nxt;
@@ -467,7 +481,14 @@ function resetPlayerCount(amount, min) {
   const el = $(`sp-${amount}`);
   const we = $(`sw-${amount}`);
   if (!el) return;
-  const val = isBotDisplayActive(amount) ? min : 0;
+  let val;
+  if (amount === 10) {
+    // EAT = UTC+3
+    const _eatH = (new Date().getUTCHours() + 3) % 24;
+    val = _eatH >= 12 ? 40 : 0;
+  } else {
+    val = isBotDisplayActive(amount) ? min : 0;
+  }
   el.textContent = val;
   we.textContent = val * amount;
 }
@@ -781,7 +802,10 @@ async function findOrCreateRoom(stake) {
   const pushed  = push(newRoom);
   const roomId  = pushed.key;
 
-  const joinDeadline = Date.now() + JOIN_SEC * 1000;
+  // Sync joinDeadline with the home screen cycle so waiting countdown matches
+  const _syncedForDeadline = getSyncedCycleState(stake);
+  const _remSec = JOIN_SEC - _syncedForDeadline.elapsed;
+  const joinDeadline = Date.now() + Math.max(_remSec, 1) * 1000;
   await set(ref(db, `rooms/${roomId}`), {
     id: roomId,
     stake,
@@ -874,7 +898,15 @@ function calcBotsNeeded(stake, realCount) {
   if (stake === 10) {
     // No bots if 9+ real players
     if (realCount >= 9) return 0;
-    return Math.floor(Math.random() * (19 - 3 + 1)) + 3;
+    // Ethiopian clock: ቀን 6 (12:00 EAT) to ሌሊት 6 (00:00 EAT) → 40–90 bots
+    //                  ሌሊት 6 (00:00 EAT) to ቀን 6 (12:00 EAT) → 0–20 bots
+    // EAT = UTC+3
+    const _eatHour10 = (new Date().getUTCHours() + 3) % 24;
+    if (_eatHour10 >= 12) {
+      return Math.floor(Math.random() * (90 - 40 + 1)) + 40; // 40–90
+    } else {
+      return Math.floor(Math.random() * 21); // 0–20
+    }
   }
 
   // For all other stakes: no bots if 3+ real players
@@ -1196,7 +1228,11 @@ function startWaitingCountdown() {
 }
 
 function updateGameWaitingUI(players, stake) {
-  // No-op: countdown is driven purely by joinDeadline in startWaitingCountdown
+  // Sync the game waiting overlay player count with the frozen home screen count
+  const homeCountEl = document.getElementById('sp-' + stake);
+  const homeCount = homeCountEl ? (parseInt(homeCountEl.textContent) || players.length) : players.length;
+  const subEl = document.getElementById('gwolSub');
+  if (subEl) subEl.textContent = '👥 ' + homeCount + ' ተጫዋቾች ተቀላቅለዋል';
 }
 
 function hideGameWaitingOverlay() {
@@ -1226,16 +1262,20 @@ function startGameUI(room) {
   const players = room.players ? Object.values(room.players) : [];
 
   $("gtbRound").textContent   = "Stake: " + room.stake + " ETB";
-  $("gtbPlayers").textContent = "👥 " + players.length;
+
+  // Use frozen home screen count so game player count matches what user saw before joining
+  const _homeCountEl = document.getElementById("sp-" + room.stake);
+  const _homeCount = _homeCountEl ? (parseInt(_homeCountEl.textContent) || players.length) : players.length;
+  $("gtbPlayers").textContent = "👥 " + _homeCount;
 
   // FIX 2: Fetch fresh room data to get all players including bots for accurate prize
   get(ref(db, `rooms/${currentRoomId}`)).then(snap => {
     if (!snap.exists()) return;
     const freshRoom = snap.val();
     const allPlayers = freshRoom.players ? Object.values(freshRoom.players) : [];
-    const prize = calcPrize(allPlayers.length, freshRoom.stake);
+    const prize = calcPrize(_homeCount, freshRoom.stake);
     $("gtbPrize").textContent   = "🏆 " + prize + " ETB";
-    $("gtbPlayers").textContent = "👥 " + allPlayers.length;
+    $("gtbPlayers").textContent = "👥 " + _homeCount;
     renderPlayersStrip(allPlayers);
   });
 
