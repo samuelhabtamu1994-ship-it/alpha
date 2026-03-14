@@ -314,12 +314,7 @@ function startCycleEngine() {
     if (NO_PLAYER_STAKES.has(cfg.amount)) return;
 
     // Set initial display immediately on load
-    if (cfg.amount === 10) {
-      _initSim10();
-      _writeSim10();
-    } else {
-      fluctuatePlayers(cfg.amount);
-    }
+    fluctuatePlayers(cfg.amount);
 
     setInterval(() => {
       // Always re-derive from real clock so all users stay in sync
@@ -340,9 +335,6 @@ function startCycleEngine() {
   });
 }
 
-// Track last displayed count per stake to detect changes for card-screen refresh
-const _lastDisplayedCount = {};
-
 function updateStakeCycleUI(amount) {
   const st  = cycleState[amount];
   const ph  = $(`sph-${amount}`);
@@ -351,28 +343,10 @@ function updateStakeCycleUI(amount) {
   const tv  = $(`stv-${amount}`);
   if (!ph) return;
 
-  // Route player-count updates:
-  //   10 Birr → _tickSim10 runs every tick (handles climb + breathing + freeze internally)
-  //   Other stakes → old probabilistic fluctuatePlayers (25% chance per second)
-  if (amount === 10) {
-    _tickSim10(st.phase);
-  } else if (st.phase === "join" && Math.random() < 0.25) {
-    fluctuatePlayers(amount);
-  }
+  // Only fluctuate during join phase — freeze count when game has started
+  const displayedCountBefore = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
+  if (st.phase === "join" && Math.random() < 0.25) fluctuatePlayers(amount);
   const displayedCount = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
-
-  // If user is on card selection for this stake and the displayed count changed,
-  // silently refresh taken cards so newly-occupied cards grey out in real-time
-  const prevCount = _lastDisplayedCount[amount] ?? displayedCount;
-  if (
-    displayedCount !== prevCount &&
-    $("screen-card").classList.contains("active") &&
-    selectedStake === amount &&
-    st.phase === "join"
-  ) {
-    refreshTakenCardsUI(amount);
-  }
-  _lastDisplayedCount[amount] = displayedCount;
 
   // If 0 or 1 player showing — freeze timer at 30s, never show "started"
   if (displayedCount <= 1) {
@@ -401,91 +375,6 @@ function updateStakeCycleUI(amount) {
   if ($("screen-card").classList.contains("active") && selectedStake === amount) {
     updateStartBtn(amount);
   }
-}
-
-// ===========================================================================
-//  10 BIRR — DYNAMIC SCALING + GRADUAL GROWTH SIMULATION
-// ===========================================================================
-
-/**
- * Live simulation state for the 10 Birr stake.
- *   'idle'      – app just loaded
- *   'climbing'  – count growing from small base → target
- *   'breathing' – target reached: gentle ±1/±2 jitter
- *   'frozen'    – game is live: count locked until next join phase
- */
-const _sim10 = { target: 0, current: 0, phase: 'idle', frozenCount: 0 };
-
-/**
- * Time-gated target:
- *   12:00 PM → 12:00 AM  →  20 – 90 players  (peak)
- *   12:00 AM → 12:00 PM  →   0 – 20 players  (off-peak)
- */
-function _getTarget10() {
-  const h = new Date().getHours();
-  return h >= 12
-    ? Math.floor(Math.random() * 71) + 20   // 20-90
-    : Math.floor(Math.random() * 21);        // 0-20
-}
-
-/** Initialise (or re-initialise) at the start of each new join phase. */
-function _initSim10() {
-  _sim10.target = _getTarget10();
-  if (_sim10.target === 0) {
-    _sim10.current = 0;
-    _sim10.phase   = 'breathing';
-  } else {
-    const base     = Math.min(Math.floor(Math.random() * 3) + 3, _sim10.target);
-    _sim10.current = base;
-    _sim10.phase   = base >= _sim10.target ? 'breathing' : 'climbing';
-  }
-}
-
-/** Write _sim10.current to the DOM. */
-function _writeSim10() {
-  const el = $('sp-10');
-  const we = $('sw-10');
-  if (el) el.textContent = _sim10.current;
-  if (we) we.textContent = _sim10.current * 10;
-}
-
-/** Advance 10 Birr simulation by one second tick. */
-function _tickSim10(gamePhase) {
-  // FREEZE: game running — lock the displayed count
-  if (gamePhase === 'started') {
-    if (_sim10.phase !== 'frozen') {
-      _sim10.frozenCount = _sim10.current; // snapshot once for calcBotsNeeded
-    }
-    _sim10.phase = 'frozen';
-    _writeSim10();
-    return;
-  }
-
-  // First tick of a new join phase
-  if (_sim10.phase === 'idle' || _sim10.phase === 'frozen') {
-    _initSim10();
-  }
-
-  // CLIMBING — grow toward target with natural steps
-  if (_sim10.phase === 'climbing') {
-    const STEPS = [0, 1, 1, 2, 2, 2, 3, 5];
-    const step  = STEPS[Math.floor(Math.random() * STEPS.length)];
-    _sim10.current = Math.min(_sim10.current + step, _sim10.target);
-    if (_sim10.current >= _sim10.target) _sim10.phase = 'breathing';
-  }
-
-  // BREATHING — subtle jitter (~40% of ticks)
-  if (_sim10.phase === 'breathing') {
-    if (Math.random() < 0.40) {
-      const sign  = Math.random() < 0.5 ? 1 : -1;
-      const delta = Math.random() < 0.65 ? 1 : 2;
-      const lo    = Math.max(0, _sim10.target - 3);
-      const hi    = _sim10.target + 2;
-      _sim10.current = Math.min(Math.max(_sim10.current + sign * delta, lo), hi);
-    }
-  }
-
-  _writeSim10();
 }
 
 // Cache bot display max per stake — re-rolls once per cycle window
@@ -540,9 +429,6 @@ function isBotDisplayActive(amount) {
 }
 
 function fluctuatePlayers(amount) {
-  // 10 Birr is managed by _tickSim10 — do not touch it here
-  if (amount === 10) return;
-
   const cfg = STAKE_CONFIG.find(c => c.amount === amount);
   if (!cfg) return;
   const el = $(`sp-${amount}`);
@@ -566,7 +452,6 @@ function fluctuatePlayers(amount) {
 }
 
 function dropPlayers(amount) {
-  if (amount === 10) return; // managed by _tickSim10
   const cfg = STAKE_CONFIG.find(c => c.amount === amount);
   if (!cfg) return;
   const el = $(`sp-${amount}`);
@@ -579,11 +464,6 @@ function dropPlayers(amount) {
 }
 
 function resetPlayerCount(amount, min) {
-  if (amount === 10) {
-    _initSim10();
-    _writeSim10();
-    return;
-  }
   const el = $(`sp-${amount}`);
   const we = $(`sw-${amount}`);
   if (!el) return;
@@ -748,35 +628,6 @@ function renderCardPicker() {
     });
     grid.appendChild(el);
   }
-}
-
-/**
- * Silently refresh the taken/available state of every card cell
- * WITHOUT re-building the grid (so the user's current selection is preserved).
- * Called whenever the displayed player count changes while on screen-card.
- */
-async function refreshTakenCardsUI(amount) {
-  await loadTakenCards(amount);
-  // If the user's currently-picked card just became taken, deselect it
-  if (pickedCardNo && takenCards.has(pickedCardNo)) {
-    pickedCardNo = 0;
-    $("cpLabel").textContent = "ካርድ አልተመረጠም";
-    const preview = $("bingoPreview");
-    if (preview) preview.innerHTML = "";
-    enableStartBtn();
-  }
-  // Patch each cell's classes in-place — no DOM rebuild
-  $$(".cp-num").forEach(el => {
-    const n = parseInt(el.dataset.num);
-    if (!n) return;
-    if (takenCards.has(n)) {
-      el.classList.add("taken");
-      el.classList.remove("selected");
-    } else {
-      el.classList.remove("taken");
-      if (n === pickedCardNo) el.classList.add("selected");
-    }
-  });
 }
 
 function renderPreview(seed) {
@@ -1023,12 +874,6 @@ function calcBotsNeeded(stake, realCount) {
   if (stake === 10) {
     // No bots if 9+ real players
     if (realCount >= 9) return 0;
-    // Use frozen display count so in-game total matches what home screen showed
-    const frozen = _sim10.frozenCount;
-    if (frozen > 0) {
-      return Math.max(0, Math.min(frozen - realCount, MAX_PLAYERS - realCount));
-    }
-    // Fallback — frozen count not yet set
     return Math.floor(Math.random() * (19 - 3 + 1)) + 3;
   }
 
