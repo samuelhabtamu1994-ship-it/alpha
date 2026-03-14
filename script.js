@@ -313,7 +313,7 @@ function startCycleEngine() {
   STAKE_CONFIG.forEach(cfg => {
     if (NO_PLAYER_STAKES.has(cfg.amount)) return;
 
-    // Set initial display — snap immediately to correct range
+    // Elapsed-aware initial display: start close to target if deep in join phase
     resetPlayerCount(cfg.amount, cfg.min);
 
     setInterval(() => {
@@ -345,7 +345,10 @@ function updateStakeCycleUI(amount) {
 
   // Only fluctuate during join phase — freeze count when game has started
   const displayedCountBefore = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
-  if (st.phase === "join") fluctuatePlayers(amount);
+  if (st.phase === "join") {
+    if (!_climbState[amount] || _climbState[amount].climbing || Math.random() < 0.5)
+      fluctuatePlayers(amount);
+  }
   const displayedCount = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
 
   // If 0 or 1 player showing — freeze timer at 30s, never show "started"
@@ -381,9 +384,7 @@ function updateStakeCycleUI(amount) {
 const _botDisplayCache = {};
 function getBotDisplayMax(amount) {
   if (amount === 10) {
-    // Ethiopian clock: ቀን 6 (12:00 EAT) to ሌሊት 6 (00:00 EAT) → display up to 90
-    //                  ሌሊት 6 (00:00 EAT) to ቀን 6 (12:00 EAT) → display up to 20
-    // EAT = UTC+3
+    // EAT = UTC+3: ቀን 6 (12:00 EAT) → max 90, ሌሊት 6 (00:00 EAT) → max 20
     const _eatHour10d = (new Date().getUTCHours() + 3) % 24;
     return _eatHour10d >= 12 ? 90 : 20;
   }
@@ -434,64 +435,99 @@ function isBotDisplayActive(amount) {
   return true;
 }
 
-function fluctuatePlayers(amount) {
-  const cfg = STAKE_CONFIG.find(c => c.amount === amount);
-  if (!cfg) return;
-  const el = $(`sp-${amount}`);
-  const we = $(`sw-${amount}`);
-  if (!el) return;
+// ── Climb state per stake ────────────────────────────────────────────────────
+const _climbState = {};
 
-  const maxBots = getBotDisplayMax(amount);
-
-  if (maxBots === 0) {
-    el.textContent = 0;
-    we.textContent = 0;
-    return;
-  }
-
-  let minDisplay;
+function _getMinDisplay(amount) {
   if (amount === 10) {
-    // EAT = UTC+3: ቀን 6 (12:00 EAT) → 40-90 bots, ሌሊት 6 (00:00 EAT) → 0-20 bots
     const _eatH = (new Date().getUTCHours() + 3) % 24;
-    minDisplay = _eatH >= 12 ? 40 : 0;
-  } else {
-    minDisplay = 1;
+    return _eatH >= 12 ? 40 : 0;
   }
-  // Snap cur into valid range immediately (handles time-of-day transitions)
-  const cur = Math.min(Math.max(parseInt(el.textContent) || minDisplay, minDisplay), maxBots);
-  const chg = Math.random() > 0.45 ? Math.floor(Math.random() * 3) + 1 : -Math.floor(Math.random() * 2);
-  const nxt = Math.min(Math.max(cur + chg, minDisplay), maxBots);
-  el.textContent = nxt;
-  we.textContent = nxt * amount;
-}
-
-function dropPlayers(amount) {
-  const cfg = STAKE_CONFIG.find(c => c.amount === amount);
-  if (!cfg) return;
-  const el = $(`sp-${amount}`);
-  const we = $(`sw-${amount}`);
-  if (!el) return;
-  const cur = parseInt(el.textContent) || cfg.min;
-  const nxt = Math.max(cur - Math.floor(Math.random() * 2) - 1, cfg.min);
-  el.textContent = nxt;
-  we.textContent = nxt * amount;
+  return 1;
 }
 
 function resetPlayerCount(amount, min) {
   const el = $(`sp-${amount}`);
   const we = $(`sw-${amount}`);
   if (!el) return;
-  let val;
-  if (amount === 10) {
-    // EAT = UTC+3
-    const _eatH = (new Date().getUTCHours() + 3) % 24;
-    val = _eatH >= 12 ? 40 : 0;
-  } else {
-    val = isBotDisplayActive(amount) ? min : 0;
+
+  const maxBots    = getBotDisplayMax(amount);
+  const minDisplay = _getMinDisplay(amount);
+
+  if (maxBots === 0) {
+    el.textContent = 0;
+    if (we) we.textContent = 0;
+    _climbState[amount] = { target: 0, climbing: false, elapsed: 0 };
+    return;
   }
-  el.textContent = val;
-  we.textContent = val * amount;
+
+  const target  = Math.floor(Math.random() * (maxBots - minDisplay + 1)) + minDisplay;
+  const elapsed = cycleState[amount] ? cycleState[amount].elapsed : 0;
+
+  // Scale start point based on how far into the join phase we are
+  const ratio = Math.min(elapsed / JOIN_SEC, 1);
+  const base  = Math.min(Math.floor(3 + ratio * (target - 3)), target);
+
+  el.textContent = base;
+  if (we) we.textContent = base * amount;
+  _climbState[amount] = { target, climbing: base < target, elapsed };
 }
+
+function fluctuatePlayers(amount) {
+  const el = $(`sp-${amount}`);
+  const we = $(`sw-${amount}`);
+  if (!el) return;
+
+  const maxBots = getBotDisplayMax(amount);
+  if (maxBots === 0) {
+    el.textContent = 0;
+    if (we) we.textContent = 0;
+    return;
+  }
+
+  const minDisplay = _getMinDisplay(amount);
+  const state      = _climbState[amount];
+  if (!state) { resetPlayerCount(amount, minDisplay); return; }
+
+  const cur    = parseInt(el.textContent) || minDisplay;
+  const remSec = JOIN_SEC - (cycleState[amount] ? cycleState[amount].elapsed : 0);
+
+  if (state.climbing) {
+    const remaining = state.target - cur;
+    if (remaining <= 0) {
+      state.climbing = false;
+      el.textContent = state.target;
+      if (we) we.textContent = state.target * amount;
+    } else {
+      const urgency = remSec < 10 ? 5 : remSec < 20 ? 3 : 1;
+      const pause   = Math.random() < (remSec > 15 ? 0.15 : 0.05);
+      const step    = pause ? 0 : Math.min(Math.floor(Math.random() * urgency) + 1, remaining);
+      const nxt     = cur + step;
+      el.textContent = nxt;
+      if (we) we.textContent = nxt * amount;
+    }
+  } else {
+    const jitter = Math.random() < 0.4  ? 0
+                 : Math.random() < 0.6  ? (Math.random() < 0.5 ? 1 : -1)
+                 :                        (Math.random() < 0.5 ? 2 : -2);
+    const nxt = Math.min(Math.max(cur + jitter, minDisplay), maxBots);
+    el.textContent = nxt;
+    if (we) we.textContent = nxt * amount;
+  }
+}
+
+function dropPlayers(amount) {
+  const el = $(`sp-${amount}`);
+  const we = $(`sw-${amount}`);
+  if (!el) return;
+  const minDisplay = _getMinDisplay(amount);
+  const maxBots    = getBotDisplayMax(amount);
+  const cur = parseInt(el.textContent) || minDisplay;
+  const nxt = Math.min(Math.max(cur - Math.floor(Math.random() * 2) - 1, minDisplay), maxBots);
+  el.textContent = nxt;
+  if (we) we.textContent = nxt * amount;
+}
+
 
 // ===== CARD SELECTION =====
 let pickedCardNo = 1;
@@ -622,7 +658,11 @@ async function loadTakenCards(amount) {
   let seed = cycleWindowId * 997 + amount * 31;
   function seededRand() { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return Math.abs(seed) / 0xffffffff; }
 
-  while (takenCards.size < displayedCount) {
+  // Cap at 99 to avoid near-infinite loop (only 100 cards exist)
+  const targetTaken = Math.min(displayedCount, 99);
+  let loopGuard = 0;
+  while (takenCards.size < targetTaken && loopGuard < 2000) {
+    loopGuard++;
     const fakeCard = Math.floor(seededRand() * 100) + 1;
     takenCards.add(fakeCard);
   }
@@ -896,11 +936,7 @@ function calcBotsNeeded(stake, realCount) {
   const rnd = Math.random();
 
   if (stake === 10) {
-    // No bots if 9+ real players
     if (realCount >= 9) return 0;
-    // Ethiopian clock: ቀን 6 (12:00 EAT) to ሌሊት 6 (00:00 EAT) → 40–90 bots
-    //                  ሌሊት 6 (00:00 EAT) to ቀን 6 (12:00 EAT) → 0–20 bots
-    // EAT = UTC+3
     const _eatHour10 = (new Date().getUTCHours() + 3) % 24;
     if (_eatHour10 >= 12) {
       return Math.floor(Math.random() * (90 - 40 + 1)) + 40; // 40–90
@@ -1228,7 +1264,6 @@ function startWaitingCountdown() {
 }
 
 function updateGameWaitingUI(players, stake) {
-  // Sync the game waiting overlay player count with the frozen home screen count
   const homeCountEl = document.getElementById('sp-' + stake);
   const homeCount = homeCountEl ? (parseInt(homeCountEl.textContent) || players.length) : players.length;
   const subEl = document.getElementById('gwolSub');
@@ -1263,7 +1298,6 @@ function startGameUI(room) {
 
   $("gtbRound").textContent   = "Stake: " + room.stake + " ETB";
 
-  // Use frozen home screen count so game player count matches what user saw before joining
   const _homeCountEl = document.getElementById("sp-" + room.stake);
   const _homeCount = _homeCountEl ? (parseInt(_homeCountEl.textContent) || players.length) : players.length;
   $("gtbPlayers").textContent = "👥 " + _homeCount;
