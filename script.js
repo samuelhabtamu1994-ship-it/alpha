@@ -351,6 +351,32 @@ function updateStakeCycleUI(amount) {
   }
   const displayedCount = parseInt(($(`sp-${amount}`) || {}).textContent) || 0;
 
+  // Live update card picker if user is on card screen for this stake
+  if (
+    $("screen-card") && $("screen-card").classList.contains("active") &&
+    selectedStake === amount &&
+    displayedCount !== displayedCountBefore
+  ) {
+    // Sync takenCards to new displayed count using same seeded logic
+    const _cycleWindowId = Math.floor(Date.now() / (CYCLE_PERIOD * 1000));
+    let _seed = _cycleWindowId * 997 + amount * 31;
+    function _seededRand() { _seed = (_seed * 1664525 + 1013904223) & 0xffffffff; return Math.abs(_seed) / 0xffffffff; }
+    takenCards = new Set();
+    // Shuffled pool for even distribution across 1-150
+    const _livePool = Array.from({length: 150}, (_, i) => i + 1);
+    let _ls = _cycleWindowId * 997 + amount * 31;
+    for (let _li = 149; _li > 0; _li--) {
+      _ls = (_ls * 1664525 + 1013904223) & 0xffffffff;
+      const _lj = Math.abs(_ls) % (_li + 1);
+      [_livePool[_li], _livePool[_lj]] = [_livePool[_lj], _livePool[_li]];
+    }
+    const _targetTaken = Math.min(displayedCount, 149);
+    for (let _lk = 0; _lk < _targetTaken; _lk++) {
+      takenCards.add(_livePool[_lk]);
+    }
+    renderCardPicker();
+  }
+
   // If 0 or 1 player showing — freeze timer at 30s, never show "started"
   if (displayedCount <= 1) {
     ph.className    = "sc-phase phase-join";
@@ -566,6 +592,30 @@ window.goHome = () => {
     btn.style.cursor = "pointer";
   }
   showScreen("screen-home");
+
+  // Force all stakes to show "join" phase UI so user never sees "ጨዋታ ጀምሯል"
+  // after returning from result screen — regardless of cycle clock position
+  STAKE_CONFIG.forEach(cfg => {
+    if (NO_PLAYER_STAKES.has(cfg.amount)) return;
+    const st = cycleState[cfg.amount];
+    if (!st || st.phase !== "started") return;
+
+    // Calculate how many seconds until next join phase
+    const remGame = GAME_SEC - st.elapsed;
+
+    // Override UI to show "ቅስቅስ..." with accurate countdown
+    const ph  = $(`sph-${cfg.amount}`);
+    const lbl = $(`sphl-${cfg.amount}`);
+    const tf  = $(`stf-${cfg.amount}`);
+    const tv  = $(`stv-${cfg.amount}`);
+    if (!ph) return;
+
+    ph.className    = "sc-phase phase-join";
+    lbl.textContent = "ቅስቅስ...";
+    tf.className    = "sc-timer-fill tf-join";
+    tf.style.width  = ((remGame / GAME_SEC) * 100) + "%";
+    tv.textContent  = remGame + "s";
+  });
 };
 
 function enableStartBtn() {
@@ -632,7 +682,14 @@ function updateStartBtn(amount) {
 async function loadTakenCards(amount) {
   takenCards = new Set();
 
-  // Step 1: get REAL players already in rooms (these have real card numbers)
+  // If phase is "started" — release all cards (game running, no one can join)
+  const _phase = cycleState[amount] ? cycleState[amount].phase : "join";
+  const _displayedCount = parseInt((document.getElementById(`sp-${amount}`) || {}).textContent) || 0;
+  if (_phase === "started" || _displayedCount <= 1) {
+    return; // all cards free
+  }
+
+  // Step 1: get REAL players already in rooms
   const snap = await get(ref(db, `rooms`));
   if (snap.exists()) {
     snap.forEach(roomSnap => {
@@ -646,32 +703,34 @@ async function loadTakenCards(amount) {
     });
   }
 
-  // Step 2: read the DISPLAYED player count from the home screen (the fake/fluctuating number)
+  // Step 2: read displayed player count from home screen
   const displayEl = document.getElementById(`sp-${amount}`);
   const displayedCount = displayEl ? (parseInt(displayEl.textContent) || 0) : 0;
 
-  // Step 3: if displayed count > actual real players, fill up with deterministic fake taken cards
-  // Use a seed so the same fake cards are taken consistently within a cycle window
-  // Seed based on cycle window only (not elapsed seconds) so taken cards stay
-  // stable during the entire join phase and only reset when a new cycle begins
+  // Step 3: fill fake taken cards based on displayed count (deterministic seed)
   const cycleWindowId = Math.floor(Date.now() / (CYCLE_PERIOD * 1000));
   let seed = cycleWindowId * 997 + amount * 31;
   function seededRand() { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return Math.abs(seed) / 0xffffffff; }
 
-  // Cap at 99 to avoid near-infinite loop (only 100 cards exist)
-  const targetTaken = Math.min(displayedCount, 99);
-  let loopGuard = 0;
-  while (takenCards.size < targetTaken && loopGuard < 2000) {
-    loopGuard++;
-    const fakeCard = Math.floor(seededRand() * 100) + 1;
-    takenCards.add(fakeCard);
+  // Build a seeded-shuffled pool of 1-150, then take the first N
+  // This guarantees even distribution across all card numbers
+  const _pool = Array.from({length: 150}, (_, i) => i + 1);
+  let _s = seed; // use already-advanced seed
+  for (let _i = 149; _i > 0; _i--) {
+    _s = (_s * 1664525 + 1013904223) & 0xffffffff;
+    const _j = Math.abs(_s) % (_i + 1);
+    [_pool[_i], _pool[_j]] = [_pool[_j], _pool[_i]];
+  }
+  const targetTaken = Math.min(displayedCount, 149);
+  for (let _k = 0; _k < targetTaken; _k++) {
+    takenCards.add(_pool[_k]);
   }
 }
 
 function renderCardPicker() {
   const grid = $("cardPickerGrid");
   grid.innerHTML = "";
-  for (let i = 1; i <= 100; i++) {
+  for (let i = 1; i <= 150; i++) {
     const el = document.createElement("div");
     el.className = "cp-num" + (takenCards.has(i) ? " taken" : "") + (i === pickedCardNo ? " selected" : "");
     el.textContent = i;
@@ -1077,7 +1136,7 @@ function scheduleGameStart(roomId, room) {
 function pickBotCardNo(existingPlayers) {
   const taken = new Set(existingPlayers.map(p => p.cardNo).filter(Boolean));
   let n;
-  do { n = Math.floor(Math.random() * 100) + 1; } while (taken.has(n));
+  do { n = Math.floor(Math.random() * 150) + 1; } while (taken.has(n));
   return n;
 }
 
